@@ -1,0 +1,16 @@
+{
+  "name": "NSS Connect",
+  "short_name": "NSS Connect",
+  "description": "Events, attendance, hours and achievements for the NSS unit.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#F1F3F6",
+  "theme_color": "#E8542C",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
