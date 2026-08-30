@@ -15,17 +15,16 @@ import {
   Phone,
   Hash,
 } from "lucide-react";
+import ExportButton from "./ExportButton";
 
 const POSITIONS = [
-  "General Secretary",
-  "Joint Secretary",
-  "Event Head",
-  "Media & PR Head",
-  "Technical Head",
-  "Logistics Head",
-  "Documentation Head",
-  "Design Head",
+  "NSS Leader",
+  "NSS Co-Leader",
+  "Event Management Head",
   "Social Media Head",
+  "Documentation Head",
+  "Creativity Head",
+  "Cultural Head",
 ];
 
 export default async function VolunteersPage({
@@ -106,7 +105,23 @@ export default async function VolunteersPage({
               Manage 2-year volunteer lifecycle, promote Core Team heads, and mark graduations.
             </p>
           </div>
-          <AddVolunteerModal positions={POSITIONS} />
+          <div className="flex gap-2">
+            <AddVolunteerModal positions={POSITIONS} />
+            <ExportButton
+              filename="nss-volunteers"
+              rows={filteredVolunteers.map((v) => ({
+                Name: v.full_name,
+                Department: v.department ?? "",
+                "Academic Year": v.year ?? "",
+                "Tenure Year": v.tenure_year ?? 1,
+                Status: v.status,
+                Position: roleByUser.get(v.id)?.position ?? "",
+                "Hours Logged": hoursByUser.get(v.id) ?? 0,
+                Phone: v.phone ?? "",
+                "Roll Number": v.roll_number ?? "",
+              }))}
+            />
+          </div>
         </div>
 
         {/* Stats Grid */}
@@ -259,4 +274,3 @@ export default async function VolunteersPage({
     </div>
   );
 }
-

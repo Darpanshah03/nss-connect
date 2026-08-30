@@ -1,8 +1,8 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { revalidatePath } from "next/cache";
 
 async function verifyOfficial() {
   const supabase = createClient();
@@ -76,10 +76,14 @@ export async function setVolunteerStatus(
   revalidatePath("/team");
 }
 
-export async function inviteVolunteer(formData: FormData) {
-  const { supabase } = await verifyOfficial(); // keeps your existing auth check
+// Creates a real login account directly — the official sets the password
+// themselves and hands it to the volunteer. No email is sent, so this
+// doesn't depend on Resend/SMTP being configured at all.
+export async function createVolunteerAccount(formData: FormData) {
+  const { supabase } = await verifyOfficial();
 
   const email = (formData.get("email") as string)?.trim().toLowerCase();
+  const password = formData.get("password") as string;
   const fullName = (formData.get("full_name") as string)?.trim();
   const department = (formData.get("department") as string)?.trim() || null;
   const year = parseInt(formData.get("year") as string) || null;
@@ -89,24 +93,31 @@ export async function inviteVolunteer(formData: FormData) {
   const position = (formData.get("position") as string)?.trim() || null;
 
   if (!email || !email.includes("@")) throw new Error("A valid email is required.");
+  if (!password || password.length < 8) throw new Error("Password must be at least 8 characters.");
   if (!fullName) throw new Error("Full name is required.");
 
   const admin = createAdminClient();
 
-  // This creates the real auth user AND sends the one-time "set your password"
-  // email in a single call. Your existing on_auth_user_created trigger fires
-  // immediately after, creating default profiles/roles rows.
-  const { data, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
-    data: { full_name: fullName },
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback?next=/set-password`,
+  // email_confirm: true means they can log in immediately with this
+  // password — no confirmation email step at all.
+  const { data, error: createErr } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { full_name: fullName },
   });
 
-  if (inviteErr) throw new Error(inviteErr.message);
+  if (createErr) {
+    if (createErr.message.toLowerCase().includes("already registered")) {
+      throw new Error("An account with this email already exists.");
+    }
+    throw new Error(createErr.message);
+  }
 
   const newUserId = data.user.id;
 
-  // Fill in the extra fields your trigger doesn't set. Small delay isn't
-  // needed — the trigger runs inside the same transaction as user creation.
+  // Your on_auth_user_created trigger already made default profiles/roles
+  // rows — this fills in the extra fields the trigger doesn't set.
   const { error: profileErr } = await supabase
     .from("profiles")
     .update({
@@ -132,4 +143,3 @@ export async function inviteVolunteer(formData: FormData) {
   revalidatePath("/official/volunteers");
   revalidatePath("/team");
 }
-
