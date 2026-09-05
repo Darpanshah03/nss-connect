@@ -36,6 +36,19 @@ export async function postAchievement(formData: FormData) {
 
   if (!title) throw new Error("Achievement title is required.");
 
+  let photoUrl: string | null = null;
+   const photoFile = formData.get("photo") as File | null;
+   if (photoFile && photoFile.size > 0) {
+     const ext = photoFile.name.split(".").pop();
+     const path = `achievements/${crypto.randomUUID()}.${ext}`;
+     const { error: uploadErr } = await supabase.storage
+       .from("nss-media")
+       .upload(path, photoFile, { contentType: photoFile.type });
+     if (uploadErr) throw new Error(`Photo upload failed: ${uploadErr.message}`);
+     const { data: publicUrlData } = supabase.storage.from("nss-media").getPublicUrl(path);
+     photoUrl = publicUrlData.publicUrl;
+   }
+
   const { error } = await supabase.from("achievements").insert({
     title,
     description,
@@ -44,6 +57,7 @@ export async function postAchievement(formData: FormData) {
     user_id: userId || null,
     achieved_on: achievedOn,
     created_by: user.id,
+    photo_url: photoUrl,
   });
 
   if (error) throw new Error(error.message);

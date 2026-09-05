@@ -15,7 +15,7 @@ import {
   Phone,
   Hash,
 } from "lucide-react";
-import ExportButton from "./ExportButton";
+import ExportButton from "../../../components/ExportButton";
 
 const POSITIONS = [
   "NSS Leader",
@@ -40,19 +40,23 @@ export default async function VolunteersPage({
   const filter = searchParams?.filter ?? "active";
   const searchQuery = searchParams?.q?.toLowerCase() ?? "";
 
-  const [{ data: profiles }, { data: roles }, { data: hours }] = await Promise.all([
+  const [{ data: profiles }, { data: roles }, { data: hours }, { data: adjustments }] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, full_name, department, year, tenure_year, status, phone, roll_number")
       .order("created_at", { ascending: false }),
     supabase.from("roles").select("user_id, role, position"),
     supabase.from("attendance").select("user_id, hours_awarded").eq("present", true),
+    supabase.from("hour_adjustments").select("user_id, hours"),
   ]);
 
   const roleByUser = new Map((roles ?? []).map((r) => [r.user_id, r]));
   const hoursByUser = new Map<string, number>();
   (hours ?? []).forEach((h) =>
     hoursByUser.set(h.user_id, (hoursByUser.get(h.user_id) ?? 0) + Number(h.hours_awarded))
+  );
+  (adjustments ?? []).forEach((a) =>
+    hoursByUser.set(a.user_id, (hoursByUser.get(a.user_id) ?? 0) + Number(a.hours))
   );
 
   // Filter out the official account itself from the volunteer list
@@ -254,6 +258,7 @@ export default async function VolunteersPage({
                   {/* Lifecycle & Position Controls */}
                   <VolunteerActions
                     userId={p.id}
+                    fullName={p.full_name}
                     currentPosition={role?.position ?? null}
                     tenureYear={p.tenure_year ?? 1}
                     status={p.status ?? "active"}

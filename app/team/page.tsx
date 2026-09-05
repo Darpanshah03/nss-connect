@@ -21,10 +21,11 @@ export default async function TeamPage() {
   const [{ data: profiles }, { data: roles }, { data: hours }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, full_name, department, year, tenure_year, status, created_at")
+      .select("id, full_name, department, year, tenure_year, status, created_at, photo_url")      
       .order("full_name"),
     supabase.from("roles").select("user_id, role, position"),
     supabase.from("attendance").select("user_id, hours_awarded").eq("present", true),
+    // (add as a 4th parallel query)
   ]);
 
   const roleByUser = new Map((roles ?? []).map((r) => [r.user_id, r]));
@@ -102,9 +103,17 @@ export default async function TeamPage() {
                     <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500" />
 
                     <div className="flex items-start justify-between gap-3 mb-2.5">
-                      <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-900 flex items-center justify-center font-bold text-sm border border-amber-200 shadow-2xs">
-                        {member.full_name?.charAt(0) || "H"}
-                      </div>
+                      {member.photo_url ? (
+                        <img
+                          src={member.photo_url}
+                          alt={member.full_name}
+                          className="w-10 h-10 rounded-2xl object-cover border border-amber-200 shadow-2xs"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-900 flex items-center justify-center font-bold text-sm border border-amber-200 shadow-2xs">
+                          {member.full_name?.charAt(0) || "H"}
+                        </div>
+                      )}
 
                       {role?.position && (
                         <span className="inline-flex items-center gap-1 text-xs font-extrabold bg-amber-100 text-amber-900 border border-amber-300 px-3 py-1 rounded-xl shadow-xs ring-1 ring-amber-400/30">

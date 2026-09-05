@@ -6,6 +6,8 @@ import {
   setTenureYear,
   setVolunteerStatus,
   addHourAdjustment,
+  deleteVolunteerPermanently,
+  setProfilePhoto,
 } from "./actions";
 import { EVENT_CATEGORIES } from "@/lib/eventCategories";
 import type { EligibilityResult } from "@/lib/hoursEligibility";
@@ -19,6 +21,8 @@ import {
   AlertTriangle,
   Tent,
   PlusCircle,
+  Trash2,
+  Camera,
 } from "lucide-react";
 
 type BlockedAction =
@@ -27,12 +31,14 @@ type BlockedAction =
 
 export default function VolunteerActions({
   userId,
+  fullName,
   currentPosition,
   tenureYear,
   status,
   positions,
 }: {
   userId: string;
+  fullName: string;
   currentPosition: string | null;
   tenureYear: number;
   status: "active" | "graduated" | "removed";
@@ -49,6 +55,16 @@ export default function VolunteerActions({
   const [adjHours, setAdjHours] = useState("");
   const [adjReason, setAdjReason] = useState("");
   const [adjError, setAdjError] = useState<string | null>(null);
+
+  // Permanent delete — danger zone
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteTyped, setDeleteTyped] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Core member profile photo
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   function handlePositionChange(val: string) {
     if (val === "__custom__") {
@@ -125,6 +141,41 @@ export default function VolunteerActions({
     });
   }
 
+  function handlePermanentDelete() {
+    setDeleteError(null);
+    if (deleteTyped.trim() !== fullName.trim()) {
+      setDeleteError("Typed name doesn't match. Type the exact full name to confirm.");
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await deleteVolunteerPermanently(userId);
+        setDeleteOpen(false);
+      } catch (e: any) {
+        setDeleteError(e.message ?? "Could not delete this account.");
+      }
+    });
+  }
+
+  function handlePhotoSubmit() {
+    setPhotoError(null);
+    if (!photoFile) {
+      setPhotoError("Choose an image first.");
+      return;
+    }
+    const fd = new FormData();
+    fd.append("photo", photoFile);
+    startTransition(async () => {
+      try {
+        await setProfilePhoto(userId, fd);
+        setPhotoOpen(false);
+        setPhotoFile(null);
+      } catch (e: any) {
+        setPhotoError(e.message ?? "Upload failed.");
+      }
+    });
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       {/* Position Selector */}
@@ -195,6 +246,30 @@ export default function VolunteerActions({
         </button>
       )}
 
+      {/* Permanent Delete — always available, separate from soft-remove */}
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => setDeleteOpen(true)}
+        title="Permanently delete this account and all its history"
+        className="text-[11px] font-semibold bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-700 border border-slate-200 hover:border-red-200 p-1.5 rounded-xl transition-colors"
+      >
+        <Trash2 size={13} />
+      </button>
+
+      {/* Core member photo — only shown once they have a core position */}
+      {currentPosition && (
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => setPhotoOpen(true)}
+          title="Set profile photo"
+          className="text-[11px] font-semibold bg-blue-50 hover:bg-blue-100 text-brandblue border border-blue-200 p-1.5 rounded-xl transition-colors"
+        >
+          <Camera size={13} />
+        </button>
+      )}
+
       {/* Custom Position Modal */}
       {customOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
@@ -231,6 +306,51 @@ export default function VolunteerActions({
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Profile Photo Modal */}
+      {photoOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-5 max-w-sm w-full shadow-2xl border border-slate-100">
+            <h3 className="font-bold text-sm text-slate-900 mb-1">Set Profile Photo</h3>
+            <p className="text-xs text-slate-500 mb-3">
+              Shown on the Team Directory page for this core member.
+            </p>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
+              className="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-brandblue hover:file:bg-blue-100 mb-3"
+            />
+            {photoError && (
+              <div className="text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg p-2 mb-2">
+                {photoError}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPhotoOpen(false);
+                  setPhotoFile(null);
+                  setPhotoError(null);
+                }}
+                className="flex-1 border border-slate-200 rounded-xl py-2 text-xs font-semibold text-slate-600"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={handlePhotoSubmit}
+                className="flex-1 bg-brandblue text-white rounded-xl py-2 text-xs font-bold flex items-center justify-center gap-1.5"
+              >
+                {pending ? <Loader2 size={13} className="animate-spin" /> : null}
+                Upload
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -392,6 +512,61 @@ export default function VolunteerActions({
             >
               Close without proceeding
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Permanent Delete Modal — type-to-confirm */}
+      {deleteOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-red-200">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle size={18} className="text-red-600" />
+              <h3 className="font-bold text-base text-slate-900">Permanently Delete Account?</h3>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed mb-3">
+              This <strong className="text-red-700">permanently erases</strong> {fullName}'s login,
+              profile, registrations, attendance, hours, and hour adjustments. This cannot be undone
+              and is different from "Remove," which only deactivates while keeping history.
+            </p>
+            <p className="text-xs text-slate-700 font-medium mb-1.5">
+              Type <span className="font-mono font-bold">{fullName}</span> to confirm:
+            </p>
+            <input
+              type="text"
+              value={deleteTyped}
+              onChange={(e) => setDeleteTyped(e.target.value)}
+              placeholder="Type full name exactly"
+              className="w-full border border-red-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-red-500 mb-2"
+            />
+            {deleteError && (
+              <div className="text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg p-2 mb-2">
+                {deleteError}
+              </div>
+            )}
+            <div className="flex gap-2 mt-2">
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => {
+                  setDeleteOpen(false);
+                  setDeleteTyped("");
+                  setDeleteError(null);
+                }}
+                className="flex-1 border border-slate-200 rounded-xl py-2.5 text-xs font-semibold text-slate-600"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={pending || deleteTyped.trim() !== fullName.trim()}
+                onClick={handlePermanentDelete}
+                className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl py-2.5 text-xs font-bold shadow-xs flex items-center justify-center gap-1.5"
+              >
+                {pending ? <Loader2 size={13} className="animate-spin" /> : null}
+                Delete Permanently
+              </button>
+            </div>
           </div>
         </div>
       )}

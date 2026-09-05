@@ -25,6 +25,34 @@ async function verifyOfficial() {
   return { supabase, user };
 }
 
+export async function setProfilePhoto(userId: string, formData: FormData) {
+  const { supabase } = await verifyOfficial();
+
+  const photoFile = formData.get("photo") as File | null;
+  if (!photoFile || photoFile.size === 0) {
+    throw new Error("No photo selected.");
+  }
+
+  const ext = photoFile.name.split(".").pop();
+  const path = `profiles/${userId}.${ext}`;
+  const { error: uploadErr } = await supabase.storage
+    .from("nss-media")
+    .upload(path, photoFile, { contentType: photoFile.type, upsert: true });
+  if (uploadErr) throw new Error(`Photo upload failed: ${uploadErr.message}`);
+
+  const { data: publicUrlData } = supabase.storage.from("nss-media").getPublicUrl(path);
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ photo_url: publicUrlData.publicUrl })
+    .eq("id", userId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/official/volunteers");
+  revalidatePath("/team");
+}
+
+
 export async function setPosition(userId: string, position: string | null) {
   const { supabase } = await verifyOfficial();
 
@@ -190,6 +218,38 @@ export async function createVolunteerAccount(formData: FormData) {
       .eq("user_id", newUserId);
     if (roleErr) throw new Error(roleErr.message);
   }
+
+  revalidatePath("/official/volunteers");
+  revalidatePath("/team");
+}
+
+// Permanently deletes the auth account. Because profiles.id references
+// auth.users(id) on delete cascade, this cascades through profiles ->
+// roles/registrations/attendance/hour_adjustments/camp_attendance
+// automatically. achievements.user_id is "on delete set null" instead,
+// so unit-level achievement records survive with the attribution cleared.
+// This is irreversible — the modal requires typing the volunteer's name
+// to confirm before calling this.
+export async function deleteVolunteerPermanently(userId: string) {
+  const { supabase, user } = await verifyOfficial();
+
+  if (userId === user.id) {
+    throw new Error("You cannot delete your own official account.");
+  }
+
+  const { data: targetRole } = await supabase
+    .from("roles")
+    .select("role")
+    .eq("user_id", userId)
+    .single();
+
+  if (targetRole?.role === "official") {
+    throw new Error("You cannot delete another official's account.");
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.deleteUser(userId);
+  if (error) throw new Error(error.message);
 
   revalidatePath("/official/volunteers");
   revalidatePath("/team");

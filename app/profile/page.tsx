@@ -3,6 +3,7 @@ import { getViewer } from "@/lib/getViewer";
 import { createClient } from "@/lib/supabase/server";
 import Nav from "@/components/Nav";
 import { updateProfile } from "./actions";
+import { checkYearEligibility } from "@/lib/hoursEligibility";
 import {
   User,
   Sparkles,
@@ -14,6 +15,9 @@ import {
   Hash,
   Phone,
   BookOpen,
+  CheckCircle2,
+  XCircle,
+  Tent,
 } from "lucide-react";
 
 export default async function ProfilePage() {
@@ -22,6 +26,13 @@ export default async function ProfilePage() {
 
   const supabase = createClient();
   const { data: hoursTotal } = await supabase.rpc("total_hours", { uid: viewer.id });
+
+  const eligibility = await checkYearEligibility(
+    supabase,
+    viewer.id,
+    (viewer.tenureYear === 2 ? 2 : 1) as 1 | 2,
+    true
+  );
 
   return (
     <div className="md:flex min-h-screen bg-[#F8FAFC]">
@@ -82,6 +93,69 @@ export default async function ProfilePage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Year Requirements Progress Card */}
+        <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-xs mb-6">
+          <h3 className="font-bold text-sm sm:text-base text-slate-900 mb-1 flex items-center gap-2">
+            <Clock size={16} className="text-brandblue" />
+            Year {viewer.tenureYear} Requirements
+          </h3>
+          <p className="text-xs text-slateink mb-4">
+            {viewer.tenureYear === 1
+              ? "Complete these to become eligible for promotion to Year 2."
+              : "Complete these, plus attending a Special Camp during your tenure, to graduate."}
+          </p>
+
+          <div className="space-y-2.5">
+            {eligibility.breakdown.map((b) => {
+              const pct = Math.min(100, Math.round((b.earned / b.required) * 100));
+              return (
+                <div key={b.category}>
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="flex items-center gap-1.5 font-semibold text-slate-800">
+                      {b.met ? (
+                        <CheckCircle2 size={13} className="text-emerald-600" />
+                      ) : (
+                        <XCircle size={13} className="text-slate-300" />
+                      )}
+                      {b.category}
+                    </span>
+                    <span className={`font-mono font-bold ${b.met ? "text-emerald-700" : "text-slate-600"}`}>
+                      {b.earned}/{b.required} hrs
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-300 ${b.met ? "bg-emerald-500" : "bg-brandblue"}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div
+            className={`mt-4 flex items-center justify-between px-3 py-2.5 rounded-xl border text-xs ${
+              eligibility.campAttended
+                ? "bg-emerald-50 border-emerald-200"
+                : "bg-slate-50 border-slate-200"
+            }`}
+          >
+            <span className="flex items-center gap-1.5 font-semibold text-slate-800">
+              <Tent size={14} className={eligibility.campAttended ? "text-emerald-600" : "text-slate-400"} />
+              Special Camp Attendance
+            </span>
+            <span className={`font-bold ${eligibility.campAttended ? "text-emerald-700" : "text-slate-500"}`}>
+              {eligibility.campAttended ? "Attended ✓" : "Not attended yet"}
+            </span>
+          </div>
+
+          <p className="text-[11px] text-slateink mt-3">
+            Short on hours? Talk to your NSS official — they can add verified hours for activities
+            completed outside the app.
+          </p>
         </div>
 
         {/* Edit Info Form */}

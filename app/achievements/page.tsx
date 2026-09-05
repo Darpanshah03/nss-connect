@@ -33,8 +33,7 @@ export default async function AchievementsPage({
   let query = supabase
     .from("achievements")
     .select(
-      "id, title, description, category, badge_icon, achieved_on, created_at, profiles:user_id(id, full_name, department, year)"
-    )
+        "id, title, description, category, badge_icon, achieved_on, created_at, photo_url, profiles:user_id(id, full_name, department, year)"    )
     .order("achieved_on", { ascending: false });
 
   if (tab === "unit") query = query.eq("category", "unit");
@@ -96,6 +95,18 @@ export default async function AchievementsPage({
             </div>
 
             <form action={postAchievement} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Photo (Optional)
+                </label>
+                <input
+                  name="photo"
+                  type="file"
+                  accept="image/*"
+                  className="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-brandblue hover:file:bg-blue-100"
+                />
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Achievement Title *
@@ -238,6 +249,13 @@ export default async function AchievementsPage({
                 />
 
                 <div>
+                  {item.photo_url && (
+                    <img
+                      src={item.photo_url}
+                      alt={item.title}
+                      className="w-full h-36 object-cover rounded-2xl mb-3 border border-slate-100"
+                    />
+                  )}
                   <div className="flex items-start justify-between gap-2 mb-3">
                     <div className="p-2.5 bg-slate-50 rounded-2xl border border-slate-100 shadow-2xs">
                       {getIcon(item.badge_icon || "trophy")}

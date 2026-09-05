@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import Nav from "@/components/Nav";
 import AttendanceChecklist from "./AttendanceChecklist";
 import Link from "next/link";
+import ExportButton from "@/components/ExportButton";
 import { ArrowLeft, CalendarDays, MapPin, Users } from "lucide-react";
 
 export default async function AttendancePage({ params }: { params: { eventId: string } }) {
@@ -29,9 +30,6 @@ export default async function AttendancePage({ params }: { params: { eventId: st
       .from("attendance")
       .select("user_id, present, hours_awarded")
       .eq("event_id", params.eventId),
-    // Full active volunteer directory — used for the walk-in search-and-add.
-    // 100 members is small enough to ship to the client in one shot rather
-    // than round-tripping a server search on every keystroke.
     supabase
       .from("profiles")
       .select("id, full_name, department, year, tenure_year, roll_number, status")
@@ -59,6 +57,26 @@ export default async function AttendancePage({ params }: { params: { eventId: st
       rollNumber: p.roll_number ?? null,
     }));
 
+  // Build export rows: registrations gives us who's on the roster (including
+  // walk-ins once saved), attendanceList gives present/hours for anyone
+  // who's actually been marked. Not-yet-saved changes in the checklist
+  // below aren't reflected here — export shows the last saved state.
+  const attendanceByUser = new Map((attendanceList ?? []).map((a: any) => [a.user_id, a]));
+  const exportRows = (registrations ?? []).map((r: any) => {
+    const att = attendanceByUser.get(r.user_id);
+    return {
+      Name: r.profiles?.full_name ?? "Unknown",
+      Department: r.profiles?.department ?? "",
+      "Roll Number": r.profiles?.roll_number ?? "",
+      "Tenure Year": r.profiles?.tenure_year ?? 1,
+      Present: att ? (att.present ? "Yes" : "No") : "Not marked yet",
+      "Hours Awarded": att ? att.hours_awarded : 0,
+    };
+  });
+  const exportFilename = `attendance-${event.title}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-");
+
   return (
     <div className="md:flex min-h-screen bg-[#F8FAFC]">
       <Nav viewer={viewer} />
@@ -73,13 +91,16 @@ export default async function AttendancePage({ params }: { params: { eventId: st
 
         {/* Event Summary Card */}
         <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-xs mb-6">
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider bg-blue-50 text-brandblue px-2.5 py-0.5 rounded-lg border border-blue-100">
-              {event.category || "General Event"}
-            </span>
-            <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-100">
-              +{event.hours_value} Hours Credit
-            </span>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider bg-blue-50 text-brandblue px-2.5 py-0.5 rounded-lg border border-blue-100">
+                {event.category || "General Event"}
+              </span>
+              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-100">
+                +{event.hours_value} Hours Credit
+              </span>
+            </div>
+            <ExportButton filename={exportFilename} rows={exportRows} label="Export Attendance" />
           </div>
 
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">

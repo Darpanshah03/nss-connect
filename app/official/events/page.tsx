@@ -5,6 +5,7 @@ import Nav from "@/components/Nav";
 import { postEvent, deleteEvent, updateEventStatus } from "./actions";
 import Link from "next/link";
 import { EVENT_CATEGORIES } from "@/lib/eventCategories";
+import ExportButton from "@/components/ExportButton";
 import {
   CalendarDays,
   Plus,
@@ -31,16 +32,42 @@ export default async function OfficialEventsPage() {
   const upcomingEvents = eventList.filter((e) => e.status === "upcoming");
   const pastEvents = eventList.filter((e) => e.status !== "upcoming");
 
+  // Full attendance history across every event, for the "export all" button.
+  const { data: allAttendance } = await supabase
+    .from("attendance")
+    .select(
+      "present, hours_awarded, events(title, event_date, category), profiles:user_id(full_name, department, roll_number)"
+    )
+    .order("marked_at", { ascending: false });
+
+  const allAttendanceRows = (allAttendance ?? []).map((a: any) => ({
+    Event: a.events?.title ?? "",
+    Date: a.events?.event_date ?? "",
+    Category: a.events?.category ?? "",
+    Volunteer: a.profiles?.full_name ?? "",
+    Department: a.profiles?.department ?? "",
+    "Roll Number": a.profiles?.roll_number ?? "",
+    Present: a.present ? "Yes" : "No",
+    "Hours Awarded": a.hours_awarded,
+  }));
+
   return (
     <div className="md:flex min-h-screen bg-[#F8FAFC]">
       <Nav viewer={viewer} />
       <main className="flex-1 w-full px-4 pt-16 pb-24 md:px-8 md:py-8 md:pb-8 max-w-4xl">
         {/* Page Header */}
-        <div className="mb-6">
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Manage NSS Events</h1>
-          <p className="text-xs sm:text-sm text-slateink mt-0.5">
-            Post new unit events, set FCFS registration limits, and mark verified attendance.
-          </p>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Manage NSS Events</h1>
+            <p className="text-xs sm:text-sm text-slateink mt-0.5">
+              Post new unit events, set FCFS registration limits, and mark verified attendance.
+            </p>
+          </div>
+          <ExportButton
+            filename="nss-all-attendance"
+            rows={allAttendanceRows}
+            label="Export All Attendance"
+          />
         </div>
 
         {/* Post Event Form Card */}
@@ -75,7 +102,7 @@ export default async function OfficialEventsPage() {
                 </label>
                 <select
                   name="category"
-                  defaultValue="Health & Blood Donation"
+                  defaultValue={EVENT_CATEGORIES[0]}
                   className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-brandblue bg-white"
                 >
                   {EVENT_CATEGORIES.map((c) => (
@@ -306,4 +333,3 @@ export default async function OfficialEventsPage() {
     </div>
   );
 }
-
