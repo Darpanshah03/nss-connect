@@ -13,18 +13,31 @@ export default async function AttendancePage({ params }: { params: { eventId: st
 
   const supabase = createClient();
 
-  const [{ data: event }, { data: registrations }, { data: attendanceList }] =
-    await Promise.all([
-      supabase.from("events").select("*").eq("id", params.eventId).single(),
-      supabase
-        .from("registrations")
-        .select("user_id, profiles(id, full_name, department, year, tenure_year, roll_number, phone)")
-        .eq("event_id", params.eventId),
-      supabase
-        .from("attendance")
-        .select("user_id, present, hours_awarded")
-        .eq("event_id", params.eventId),
-    ]);
+  const [
+    { data: event },
+    { data: registrations },
+    { data: attendanceList },
+    { data: allProfiles },
+    { data: allRoles },
+  ] = await Promise.all([
+    supabase.from("events").select("*").eq("id", params.eventId).single(),
+    supabase
+      .from("registrations")
+      .select("user_id, profiles(id, full_name, department, year, tenure_year, roll_number, phone)")
+      .eq("event_id", params.eventId),
+    supabase
+      .from("attendance")
+      .select("user_id, present, hours_awarded")
+      .eq("event_id", params.eventId),
+    // Full active volunteer directory — used for the walk-in search-and-add.
+    // 100 members is small enough to ship to the client in one shot rather
+    // than round-tripping a server search on every keystroke.
+    supabase
+      .from("profiles")
+      .select("id, full_name, department, year, tenure_year, roll_number, status")
+      .eq("status", "active"),
+    supabase.from("roles").select("user_id, role"),
+  ]);
 
   if (!event) redirect("/official/events");
 
@@ -32,6 +45,19 @@ export default async function AttendancePage({ params }: { params: { eventId: st
     attendanceList && attendanceList.length > 0
       ? attendanceList.filter((a) => a.present).map((a) => a.user_id)
       : (registrations ?? []).map((r: any) => r.user_id);
+
+  const roleByUser = new Map((allRoles ?? []).map((r) => [r.user_id, r.role]));
+
+  const allVolunteers = (allProfiles ?? [])
+    .filter((p) => roleByUser.get(p.id) !== "official")
+    .map((p) => ({
+      id: p.id,
+      name: p.full_name ?? "Unknown Volunteer",
+      department: p.department ?? "",
+      year: p.year ?? 1,
+      tenureYear: p.tenure_year ?? 1,
+      rollNumber: p.roll_number ?? null,
+    }));
 
   return (
     <div className="md:flex min-h-screen bg-[#F8FAFC]">
@@ -93,9 +119,9 @@ export default async function AttendancePage({ params }: { params: { eventId: st
             tenureYear: r.profiles?.tenure_year ?? 1,
             rollNumber: r.profiles?.roll_number ?? null,
           }))}
+          allVolunteers={allVolunteers}
         />
       </main>
     </div>
   );
 }
-

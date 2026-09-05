@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import Nav from "@/components/Nav";
 import RegisterButton from "./RegisterButton";
 import Link from "next/link";
+import { EVENT_CATEGORIES } from "@/lib/eventCategories";
+
 import {
   CalendarDays,
   MapPin,
@@ -40,19 +42,15 @@ export default async function EventsPage({
 
   const { data: events } = await query;
 
-  const categories = [
-    "all",
-    "Health & Blood Donation",
-    "Cleanliness & Swachhata",
-    "Environment & Plantation",
-    "Education & Literacy",
-    "Social Awareness",
-    "Campus Service",
-  ];
+  const { data: countsData } = await supabase.rpc("get_event_registration_counts");
+  const countByEvent = new Map<string, number>(
+    (countsData ?? []).map((c: any) => [c.event_id, Number(c.registered_count)] as [string, number])
+  );
+
+  const categories = ["all", ...EVENT_CATEGORIES];
 
   const isCoreOrOfficial = viewer.role === "core";
   const isInactive = viewer.status !== "active";
-
 
   return (
     <div className="md:flex min-h-screen bg-[#F8FAFC]">
@@ -110,9 +108,10 @@ export default async function EventsPage({
           {(events ?? []).map((e: any) => {
             const registeredIds: string[] = (e.registrations ?? []).map((r: any) => r.user_id);
             const isRegistered = registeredIds.includes(viewer.id);
-            const isFull = registeredIds.length >= e.capacity;
-            const spotsLeft = Math.max(0, e.capacity - registeredIds.length);
-            const fillPercentage = Math.min(100, Math.round((registeredIds.length / e.capacity) * 100));
+            const totalRegistered = countByEvent.get(e.id) ?? 0;
+            const isFull = totalRegistered >= e.capacity;
+            const spotsLeft = Math.max(0, e.capacity - totalRegistered);
+            const fillPercentage = Math.min(100, Math.round((totalRegistered / e.capacity) * 100));
 
             return (
               <div
@@ -170,7 +169,7 @@ export default async function EventsPage({
                     <div className="flex justify-between text-[11px] text-slateink font-medium mb-1">
                       <span className="flex items-center gap-1">
                         <Users size={12} />
-                        Capacity: {registeredIds.length}/{e.capacity}
+                        Capacity: {totalRegistered}/{e.capacity}
                       </span>
                       <span className={isFull ? "font-bold text-red-600" : "text-slate-600"}>
                         {isFull ? "Full" : `${spotsLeft} available`}
@@ -197,7 +196,7 @@ export default async function EventsPage({
                         className="text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3.5 py-2.5 rounded-xl transition-colors inline-flex items-center gap-1.5"
                       >
                         <Users size={13} />
-                        View Roster ({registeredIds.length})
+                        View Roster ({totalRegistered})
                       </Link>
                     )}
 
@@ -232,4 +231,3 @@ export default async function EventsPage({
     </div>
   );
 }
-

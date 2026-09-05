@@ -1,16 +1,16 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { saveAttendance } from "../actions";
 import {
   CheckCircle2,
-  XCircle,
   Search,
-  Users,
   CheckSquare,
   Square,
   Loader2,
-  Sparkles,
+  UserPlus,
+  X,
+  PlusCircle,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -27,26 +27,71 @@ export default function AttendanceChecklist({
   eventId,
   hoursValue,
   volunteers,
+  allVolunteers,
   initialPresentIds,
 }: {
   eventId: string;
   hoursValue: number;
   volunteers: Volunteer[];
+  allVolunteers: Volunteer[];
   initialPresentIds?: string[];
 }) {
+  // Registered volunteers (from the event's registrations table)
+  const registeredIds = useMemo(() => new Set(volunteers.map((v) => v.id)), [volunteers]);
+
+  // Walk-ins: volunteers who weren't registered but showed up and got added here
+  const [walkInIds, setWalkInIds] = useState<Set<string>>(new Set());
+
   const [present, setPresent] = useState<Set<string>>(
     new Set(initialPresentIds ?? volunteers.map((v) => v.id))
   );
+
   const [search, setSearch] = useState("");
+  const [walkInQuery, setWalkInQuery] = useState("");
+  const [showWalkInSearch, setShowWalkInSearch] = useState(false);
+
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
 
-  const filteredVolunteers = volunteers.filter(
+  const volunteerById = useMemo(() => {
+    const map = new Map<string, Volunteer>();
+    volunteers.forEach((v) => map.set(v.id, v));
+    allVolunteers.forEach((v) => {
+      if (!map.has(v.id)) map.set(v.id, v);
+    });
+    return map;
+  }, [volunteers, allVolunteers]);
+
+  // Full roster shown in the checklist = registered + any walk-ins added
+  const roster = useMemo(() => {
+    const walkInVolunteers = Array.from(walkInIds)
+      .map((id) => volunteerById.get(id))
+      .filter((v): v is Volunteer => Boolean(v));
+    return [...volunteers, ...walkInVolunteers];
+  }, [volunteers, walkInIds, volunteerById]);
+
+  const filteredRoster = roster.filter(
     (v) =>
       v.name.toLowerCase().includes(search.toLowerCase()) ||
       v.department.toLowerCase().includes(search.toLowerCase()) ||
       (v.rollNumber && v.rollNumber.toLowerCase().includes(search.toLowerCase()))
   );
+
+  // Candidates for walk-in add: active volunteers not already on the roster
+  const walkInCandidates = useMemo(() => {
+    if (!walkInQuery.trim()) return [];
+    const q = walkInQuery.toLowerCase();
+    const onRoster = new Set(roster.map((v) => v.id));
+    return allVolunteers
+      .filter((v) => !onRoster.has(v.id))
+      .filter(
+        (v) =>
+          v.name.toLowerCase().includes(q) ||
+          v.department.toLowerCase().includes(q) ||
+          (v.rollNumber && v.rollNumber.toLowerCase().includes(q))
+      )
+      .slice(0, 6);
+  }, [walkInQuery, roster, allVolunteers]);
 
   function toggle(id: string) {
     setPresent((prev) => {
@@ -58,7 +103,7 @@ export default function AttendanceChecklist({
   }
 
   function selectAll() {
-    setPresent(new Set(volunteers.map((v) => v.id)));
+    setPresent(new Set(roster.map((v) => v.id)));
     setSaved(false);
   }
 
@@ -67,22 +112,43 @@ export default function AttendanceChecklist({
     setSaved(false);
   }
 
+  function addWalkIn(id: string) {
+    setWalkInIds((prev) => new Set(prev).add(id));
+    setPresent((prev) => new Set(prev).add(id)); // a walk-in showed up, so mark present by default
+    setWalkInQuery("");
+    setSaved(false);
+  }
+
+  function removeWalkIn(id: string) {
+    setWalkInIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    setPresent((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    setSaved(false);
+  }
+
   function handleSave() {
     startTransition(async () => {
-      await saveAttendance(eventId, Array.from(present), hoursValue);
+      await saveAttendance(eventId, Array.from(present), hoursValue, Array.from(walkInIds));
       setSaved(true);
     });
   }
 
   const presentCount = present.size;
-  const absentCount = volunteers.length - presentCount;
+  const absentCount = roster.length - presentCount;
   const totalHoursAwarded = presentCount * hoursValue;
 
   return (
     <div className="space-y-4">
       {/* Controls Bar */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        {/* Search */}
+        {/* Search within roster */}
         <div className="relative flex-1">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -95,7 +161,15 @@ export default function AttendanceChecklist({
         </div>
 
         {/* Quick Toggles */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setShowWalkInSearch((s) => !s)}
+            className="text-xs font-semibold text-white bg-brandblue hover:bg-brandblueDark px-3 py-2 rounded-xl transition-colors inline-flex items-center gap-1"
+          >
+            <UserPlus size={13} />
+            Add Walk-in
+          </button>
           <button
             type="button"
             onClick={selectAll}
@@ -114,6 +188,70 @@ export default function AttendanceChecklist({
           </button>
         </div>
       </div>
+
+      {/* Walk-in Search & Add Panel */}
+      {showWalkInSearch && (
+        <div className="bg-blue-50/50 border border-blue-200 rounded-2xl p-4 shadow-xs">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-brandblue flex items-center gap-1.5">
+              <UserPlus size={13} />
+              Search & add a volunteer who wasn't registered
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setShowWalkInSearch(false);
+                setWalkInQuery("");
+              }}
+              className="text-slate-400 hover:text-slate-600"
+            >
+              <X size={15} />
+            </button>
+          </div>
+
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              autoFocus
+              placeholder="Type a name, department, or roll number..."
+              value={walkInQuery}
+              onChange={(e) => setWalkInQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-xs border border-blue-200 bg-white rounded-xl outline-none focus:border-brandblue"
+            />
+          </div>
+
+          {walkInQuery.trim() && (
+            <div className="mt-2 bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
+              {walkInCandidates.length === 0 && (
+                <div className="px-3 py-2.5 text-xs text-slateink">
+                  No matching active volunteers found (or they're already on the roster).
+                </div>
+              )}
+              {walkInCandidates.map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => addWalkIn(v.id)}
+                  className="w-full flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-blue-50 transition-colors text-left"
+                >
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-slate-900">{v.name}</div>
+                    <div className="text-[11px] text-slateink truncate">
+                      {v.department}
+                      {v.rollNumber ? ` · ${v.rollNumber}` : ""}
+                    </div>
+                  </div>
+                  <span className="shrink-0 text-[11px] font-bold text-brandblue flex items-center gap-1">
+                    <PlusCircle size={13} />
+                    Add
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Live Count Summary Banner */}
       <div className="grid grid-cols-3 gap-2.5 text-center">
@@ -135,8 +273,9 @@ export default function AttendanceChecklist({
 
       {/* Volunteers Checklist */}
       <div className="bg-white border border-slate-200 rounded-3xl divide-y divide-slate-100 overflow-hidden shadow-xs">
-        {filteredVolunteers.map((v, idx) => {
+        {filteredRoster.map((v) => {
           const isPresent = present.has(v.id);
+          const isWalkIn = walkInIds.has(v.id);
           return (
             <label
               key={v.id}
@@ -157,6 +296,12 @@ export default function AttendanceChecklist({
                   <span className="text-[10px] font-medium bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md">
                     Tenure Year {v.tenureYear ?? 1}
                   </span>
+                  {isWalkIn && (
+                    <span className="text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                      <UserPlus size={10} />
+                      Walk-in
+                    </span>
+                  )}
                 </div>
                 <div className="text-[11px] text-slateink mt-0.5 flex flex-wrap gap-x-2">
                   {v.department && <span>{v.department}</span>}
@@ -165,7 +310,7 @@ export default function AttendanceChecklist({
                 </div>
               </div>
 
-              <div className="shrink-0">
+              <div className="shrink-0 flex items-center gap-2">
                 {isPresent ? (
                   <span className="text-xs font-bold text-brandgreen bg-emerald-100/70 border border-emerald-200 px-2.5 py-1 rounded-xl flex items-center gap-1">
                     <CheckCircle2 size={12} />
@@ -176,20 +321,34 @@ export default function AttendanceChecklist({
                     Absent (0h)
                   </span>
                 )}
+
+                {isWalkIn && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      removeWalkIn(v.id);
+                    }}
+                    title="Remove walk-in"
+                    className="text-slate-300 hover:text-red-500 transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
               </div>
             </label>
           );
         })}
 
-        {volunteers.length === 0 && (
+        {roster.length === 0 && (
           <div className="p-8 text-center text-xs sm:text-sm text-slateink">
-            No volunteers have registered for this event yet.
+            No volunteers have registered for this event yet. Use "Add Walk-in" above if someone shows up.
           </div>
         )}
 
-        {volunteers.length > 0 && filteredVolunteers.length === 0 && (
+        {roster.length > 0 && filteredRoster.length === 0 && (
           <div className="p-8 text-center text-xs sm:text-sm text-slateink">
-            No registered volunteers match "{search}".
+            No volunteers on the roster match "{search}".
           </div>
         )}
       </div>
@@ -197,7 +356,7 @@ export default function AttendanceChecklist({
       {/* Save Button */}
       <button
         onClick={handleSave}
-        disabled={pending || volunteers.length === 0}
+        disabled={pending || roster.length === 0}
         className="w-full bg-brandblue hover:bg-brandblueDark text-white rounded-2xl py-3.5 text-xs sm:text-sm font-bold shadow-md transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.99]"
       >
         {pending ? (
@@ -229,4 +388,3 @@ export default function AttendanceChecklist({
     </div>
   );
 }
-

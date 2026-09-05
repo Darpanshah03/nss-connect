@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import Nav from "@/components/Nav";
 import { postEvent, deleteEvent, updateEventStatus } from "./actions";
 import Link from "next/link";
+import { EVENT_CATEGORIES } from "@/lib/eventCategories";
 import {
   CalendarDays,
   Plus,
@@ -14,18 +15,6 @@ import {
   AlertTriangle,
   Sparkles,
 } from "lucide-react";
-
-const EVENT_CATEGORIES = [
-  "Health & Blood Donation",
-  "Cleanliness & Swachhata",
-  "Environment & Plantation",
-  "Education & Literacy",
-  "Social Awareness",
-  "Campus Service",
-  "Disaster Relief & Aid",
-  "National Days & Celebrations",
-  "Other NSS Activity",
-];
 
 export default async function OfficialEventsPage() {
   const viewer = await getViewer();

@@ -3,6 +3,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
+import { checkYearEligibility, EligibilityResult } from "@/lib/hoursEligibility";
+import { EVENT_CATEGORIES } from "@/lib/eventCategories";
 
 async function verifyOfficial() {
   const supabase = createClient();
@@ -41,11 +43,23 @@ export async function setPosition(userId: string, position: string | null) {
   revalidatePath("/team");
 }
 
-export async function setTenureYear(userId: string, tenureYear: number) {
+export async function setTenureYear(
+  userId: string,
+  tenureYear: number
+): Promise<{ success: boolean; eligibility?: EligibilityResult }> {
   const { supabase } = await verifyOfficial();
 
   if (tenureYear !== 1 && tenureYear !== 2) {
     throw new Error("Tenure year must be 1 or 2.");
+  }
+
+  // Only the Year 1 -> Year 2 promotion is gated. Moving back to Year 1
+  // (a correction) is never blocked.
+  if (tenureYear === 2) {
+    const result = await checkYearEligibility(supabase, userId, 1, false);
+    if (!result.eligible) {
+      return { success: false, eligibility: result };
+    }
   }
 
   const { error } = await supabase
@@ -57,13 +71,21 @@ export async function setTenureYear(userId: string, tenureYear: number) {
 
   revalidatePath("/official/volunteers");
   revalidatePath("/team");
+  return { success: true };
 }
 
 export async function setVolunteerStatus(
   userId: string,
   status: "active" | "graduated" | "removed"
-) {
+): Promise<{ success: boolean; eligibility?: EligibilityResult }> {
   const { supabase } = await verifyOfficial();
+
+  if (status === "graduated") {
+    const result = await checkYearEligibility(supabase, userId, 2, true);
+    if (!result.eligible) {
+      return { success: false, eligibility: result };
+    }
+  }
 
   const { error } = await supabase
     .from("profiles")
@@ -74,6 +96,39 @@ export async function setVolunteerStatus(
 
   revalidatePath("/official/volunteers");
   revalidatePath("/team");
+  return { success: true };
+}
+
+// Official adds real bonus/adjustment hours to a specific category,
+// to close an actual gap (e.g. hours earned outside the app's own tracking).
+export async function addHourAdjustment(
+  userId: string,
+  nssYear: 1 | 2,
+  category: string,
+  hours: number,
+  reason: string
+) {
+  const { supabase, user } = await verifyOfficial();
+
+  if (!EVENT_CATEGORIES.includes(category)) {
+    throw new Error("Invalid category.");
+  }
+  if (!hours || hours <= 0) {
+    throw new Error("Hours must be a positive number.");
+  }
+
+  const { error } = await supabase.from("hour_adjustments").insert({
+    user_id: userId,
+    nss_year: nssYear,
+    category,
+    hours,
+    reason: reason?.trim() || null,
+    created_by: user.id,
+  });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/official/volunteers");
 }
 
 // Creates a real login account directly — the official sets the password
@@ -98,8 +153,6 @@ export async function createVolunteerAccount(formData: FormData) {
 
   const admin = createAdminClient();
 
-  // email_confirm: true means they can log in immediately with this
-  // password — no confirmation email step at all.
   const { data, error: createErr } = await admin.auth.admin.createUser({
     email,
     password,
@@ -116,8 +169,6 @@ export async function createVolunteerAccount(formData: FormData) {
 
   const newUserId = data.user.id;
 
-  // Your on_auth_user_created trigger already made default profiles/roles
-  // rows — this fills in the extra fields the trigger doesn't set.
   const { error: profileErr } = await supabase
     .from("profiles")
     .update({
