@@ -11,6 +11,7 @@ import {
 } from "./actions";
 import { EVENT_CATEGORIES } from "@/lib/eventCategories";
 import type { EligibilityResult } from "@/lib/hoursEligibility";
+import PortraitCropper from "@/components/PortraitCropper";
 import {
   GraduationCap,
   UserX,
@@ -50,20 +51,18 @@ export default function VolunteerActions({
   const [confirmModal, setConfirmModal] = useState<"graduate" | "remove" | null>(null);
   const [blocked, setBlocked] = useState<BlockedAction | null>(null);
 
-  // Adjustment mini-form state
   const [adjCategory, setAdjCategory] = useState(EVENT_CATEGORIES[0]);
   const [adjHours, setAdjHours] = useState("");
   const [adjReason, setAdjReason] = useState("");
   const [adjError, setAdjError] = useState<string | null>(null);
 
-  // Permanent delete — danger zone
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTyped, setDeleteTyped] = useState("");
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Core member profile photo
+  // Core member profile photo — pick -> crop -> upload
   const [photoOpen, setPhotoOpen] = useState(false);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [rawPhotoFile, setRawPhotoFile] = useState<File | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
 
   function handlePositionChange(val: string) {
@@ -119,7 +118,6 @@ export default function VolunteerActions({
         await addHourAdjustment(userId, blocked.nssYear, adjCategory, hoursNum, adjReason);
         setAdjHours("");
         setAdjReason("");
-        // Re-run the original action now that hours have changed
         if (blocked.kind === "promote") {
           const result = await setTenureYear(userId, blocked.targetYear);
           if (result.success) {
@@ -157,19 +155,17 @@ export default function VolunteerActions({
     });
   }
 
-  function handlePhotoSubmit() {
+  function handleCropped(croppedBlob: Blob) {
+    if (!rawPhotoFile) return;
     setPhotoError(null);
-    if (!photoFile) {
-      setPhotoError("Choose an image first.");
-      return;
-    }
     const fd = new FormData();
-    fd.append("photo", photoFile);
+    fd.append("photo", croppedBlob, "cropped.jpg");
+    fd.append("photo_original", rawPhotoFile, rawPhotoFile.name);
     startTransition(async () => {
       try {
         await setProfilePhoto(userId, fd);
         setPhotoOpen(false);
-        setPhotoFile(null);
+        setRawPhotoFile(null);
       } catch (e: any) {
         setPhotoError(e.message ?? "Upload failed.");
       }
@@ -246,7 +242,7 @@ export default function VolunteerActions({
         </button>
       )}
 
-      {/* Permanent Delete — always available, separate from soft-remove */}
+      {/* Permanent Delete */}
       <button
         type="button"
         disabled={pending}
@@ -309,18 +305,18 @@ export default function VolunteerActions({
         </div>
       )}
 
-      {/* Profile Photo Modal */}
-      {photoOpen && (
+      {/* Photo pick step (crop step renders separately once a file is chosen) */}
+      {photoOpen && !rawPhotoFile && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl p-5 max-w-sm w-full shadow-2xl border border-slate-100">
             <h3 className="font-bold text-sm text-slate-900 mb-1">Set Profile Photo</h3>
             <p className="text-xs text-slate-500 mb-3">
-              Shown on the Team Directory page for this core member.
+              Choose an image — you'll be able to adjust the crop next.
             </p>
             <input
               type="file"
               accept="image/*"
-              onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => setRawPhotoFile(e.target.files?.[0] ?? null)}
               className="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-brandblue hover:file:bg-blue-100 mb-3"
             />
             {photoError && (
@@ -328,30 +324,27 @@ export default function VolunteerActions({
                 {photoError}
               </div>
             )}
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setPhotoOpen(false);
-                  setPhotoFile(null);
-                  setPhotoError(null);
-                }}
-                className="flex-1 border border-slate-200 rounded-xl py-2 text-xs font-semibold text-slate-600"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={handlePhotoSubmit}
-                className="flex-1 bg-brandblue text-white rounded-xl py-2 text-xs font-bold flex items-center justify-center gap-1.5"
-              >
-                {pending ? <Loader2 size={13} className="animate-spin" /> : null}
-                Upload
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setPhotoOpen(false);
+                setPhotoError(null);
+              }}
+              className="w-full border border-slate-200 rounded-xl py-2 text-xs font-semibold text-slate-600"
+            >
+              Cancel
+            </button>
           </div>
         </div>
+      )}
+
+      {/* Crop step */}
+      {photoOpen && rawPhotoFile && (
+        <PortraitCropper
+          file={rawPhotoFile}
+          onCancel={() => setRawPhotoFile(null)}
+          onCropped={handleCropped}
+        />
       )}
 
       {/* Confirmation Modal (graduate / remove) */}
@@ -410,7 +403,6 @@ export default function VolunteerActions({
                 : "This volunteer hasn't met Year 2 requirements to graduate."}
             </p>
 
-            {/* Category breakdown */}
             <div className="space-y-2 mb-4">
               {blocked.eligibility.breakdown.map((b) => (
                 <div
@@ -452,7 +444,6 @@ export default function VolunteerActions({
               )}
             </div>
 
-            {/* Add adjustment form */}
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5">
               <div className="text-xs font-bold text-slate-700 mb-2 flex items-center gap-1.5">
                 <PlusCircle size={13} />
@@ -516,7 +507,7 @@ export default function VolunteerActions({
         </div>
       )}
 
-      {/* Permanent Delete Modal — type-to-confirm */}
+      {/* Permanent Delete Modal */}
       {deleteOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-red-200">

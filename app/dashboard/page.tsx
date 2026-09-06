@@ -3,6 +3,7 @@ import { getViewer } from "@/lib/getViewer";
 import { createClient } from "@/lib/supabase/server";
 import Nav from "@/components/Nav";
 import Link from "next/link";
+import { checkYearEligibility } from "@/lib/hoursEligibility";
 import {
   Clock,
   CalendarCheck2,
@@ -13,6 +14,7 @@ import {
   ChevronRight,
   GraduationCap,
   Award,
+  AlertTriangle,
 } from "lucide-react";
 
 export default async function DashboardPage() {
@@ -41,6 +43,19 @@ export default async function DashboardPage() {
         .eq("user_id", viewer.id),
     ]);
 
+  const isYear2 = viewer.tenureYear === 2;
+
+  // Category-based eligibility for the CURRENT year — same source of truth
+  // used on /profile and by the official's promotion/graduation gate. The
+  // flat hours target below is just a simple motivator; this is what
+  // actually determines "done" vs "not done".
+  const eligibility = await checkYearEligibility(
+    supabase,
+    viewer.id,
+    (isYear2 ? 2 : 1) as 1 | 2,
+    false
+  );
+
   const upcoming = (myRegistrations ?? [])
     // @ts-expect-error - joined shape
     .filter((r) => r.events?.status === "upcoming")
@@ -50,13 +65,16 @@ export default async function DashboardPage() {
   const completedEvents = myAttendance ?? [];
   const totalVerifiedHours = Number(hoursTotal ?? 0);
 
-  // NSS Hours targets
+  // NSS Hours targets — a simple flat-total motivator, NOT the actual
+  // eligibility rule. The real rule (40/40/20/20 per category) lives in
+  // `eligibility` above and on /profile. Reaching this flat number does
+  // NOT by itself mean requirements are met — see the messaging below.
   const YEAR1_TARGET = 120;
   const TOTAL_TARGET = 240;
-  const isYear2 = viewer.tenureYear === 2;
   const hoursTarget = isYear2 ? TOTAL_TARGET : YEAR1_TARGET;
   const hoursProgress = Math.min(100, Math.round((totalVerifiedHours / hoursTarget) * 100));
   const hoursRemaining = Math.max(0, hoursTarget - totalVerifiedHours);
+  const reachedFlatTarget = totalVerifiedHours >= hoursTarget;
 
   return (
     <div className="md:flex min-h-screen bg-[#F8FAFC]">
@@ -176,9 +194,11 @@ export default async function DashboardPage() {
                 NSS Hours Progress — {isYear2 ? "Year 2 (Target: 240 Total)" : "Year 1 (Target: 120 hrs)"}
               </div>
               <div className="text-[11px] text-slateink mt-0.5">
-                {totalVerifiedHours >= hoursTarget
-                  ? "🎉 Target achieved! You have completed your NSS hour requirement."
-                  : `${hoursRemaining} hrs remaining to complete your ${isYear2 ? "2-year (240 hrs)" : "Year 1 (120 hrs)"} target`}
+                {reachedFlatTarget
+                  ? eligibility.eligible
+                    ? "🎉 Requirements met! Category minimums and total hours are both satisfied."
+                    : `You've logged ${totalVerifiedHours} hrs total, but some categories still need attention — see the breakdown on your Profile.`
+                  : `${hoursRemaining} hrs remaining to reach the ${isYear2 ? "2-year (240 hrs)" : "Year 1 (120 hrs)"} total`}
               </div>
             </div>
             <div className="text-right shrink-0">
@@ -188,13 +208,22 @@ export default async function DashboardPage() {
           </div>
           <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
             <div
-              className={`h-2.5 rounded-full transition-all ${totalVerifiedHours >= hoursTarget ? "bg-emerald-500" : "bg-brandblue"}`}
+              className={`h-2.5 rounded-full transition-all ${
+                reachedFlatTarget && eligibility.eligible ? "bg-emerald-500" : "bg-brandblue"
+              }`}
               style={{ width: `${hoursProgress}%` }}
             />
           </div>
-          {isYear2 && totalVerifiedHours < YEAR1_TARGET && (
-            <div className="mt-2 text-[11px] text-amber-700 bg-amber-50 rounded-xl px-3 py-1.5 border border-amber-200">
-              ⚠️ Year 1 target of 120 hrs not yet met. You need {YEAR1_TARGET - totalVerifiedHours} more hrs to complete Year 1 requirement.
+
+          {reachedFlatTarget && !eligibility.eligible && (
+            <div className="mt-2 text-[11px] text-amber-700 bg-amber-50 rounded-xl px-3 py-1.5 border border-amber-200 flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5">
+                <AlertTriangle size={12} className="shrink-0" />
+                Hours are unevenly spread across categories — this can block promotion/graduation.
+              </span>
+              <Link href="/profile" className="font-semibold whitespace-nowrap hover:underline">
+                View breakdown →
+              </Link>
             </div>
           )}
         </div>
@@ -343,4 +372,3 @@ export default async function DashboardPage() {
     </div>
   );
 }
-

@@ -2,21 +2,10 @@ import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/getViewer";
 import { createClient } from "@/lib/supabase/server";
 import Nav from "@/components/Nav";
-import { postAchievement, deleteAchievement } from "./actions";
+import { postAchievement } from "./actions";
+import AchievementCard from "./AchievementCard";
 import Link from "next/link";
-import {
-  Trophy,
-  Award,
-  Star,
-  Medal,
-  Heart,
-  Sparkles,
-  Plus,
-  Trash2,
-  CalendarDays,
-  User,
-  ShieldCheck,
-} from "lucide-react";
+import { Trophy, Plus } from "lucide-react";
 
 export default async function AchievementsPage({
   searchParams,
@@ -33,7 +22,8 @@ export default async function AchievementsPage({
   let query = supabase
     .from("achievements")
     .select(
-        "id, title, description, category, badge_icon, achieved_on, created_at, photo_url, profiles:user_id(id, full_name, department, year)"    )
+      "id, title, description, category, badge_icon, achieved_on, created_at, photo_url, profiles:user_id(id, full_name, department, year)"
+    )
     .order("achieved_on", { ascending: false });
 
   if (tab === "unit") query = query.eq("category", "unit");
@@ -47,22 +37,6 @@ export default async function AchievementsPage({
   ]);
 
   const items = achievements ?? [];
-
-  const getIcon = (iconName: string) => {
-    switch (iconName) {
-      case "star":
-        return <Star size={20} className="text-amber-500 fill-amber-500" />;
-      case "medal":
-        return <Medal size={20} className="text-blue-500" />;
-      case "heart":
-        return <Heart size={20} className="text-rose-500 fill-rose-500" />;
-      case "award":
-        return <Award size={20} className="text-purple-500" />;
-      case "trophy":
-      default:
-        return <Trophy size={20} className="text-amber-600 fill-amber-500" />;
-    }
-  };
 
   return (
     <div className="md:flex min-h-screen bg-[#F8FAFC]">
@@ -230,109 +204,9 @@ export default async function AchievementsPage({
 
         {/* Achievements Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {items.map((item: any) => {
-            const isUnit = item.category === "unit";
-            const profile = item.profiles;
-
-            return (
-              <div
-                key={item.id}
-                className="bg-white border border-slate-200/90 rounded-3xl p-5 shadow-xs hover:border-slate-300 transition-all flex flex-col justify-between relative overflow-hidden"
-              >
-                {/* Top highlight bar */}
-                <div
-                  className={`absolute top-0 inset-x-0 h-1.5 ${
-                    isUnit
-                      ? "bg-gradient-to-r from-amber-400 to-orange-500"
-                      : "bg-gradient-to-r from-blue-500 to-indigo-600"
-                  }`}
-                />
-
-                <div>
-                  {item.photo_url && (
-                    <img
-                      src={item.photo_url}
-                      alt={item.title}
-                      className="w-full h-36 object-cover rounded-2xl mb-3 border border-slate-100"
-                    />
-                  )}
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <div className="p-2.5 bg-slate-50 rounded-2xl border border-slate-100 shadow-2xs">
-                      {getIcon(item.badge_icon || "trophy")}
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-lg border ${
-                          isUnit
-                            ? "bg-amber-50 text-amber-800 border-amber-200"
-                            : "bg-blue-50 text-brandblue border-blue-200"
-                        }`}
-                      >
-                        {isUnit ? "Unit Milestone" : "Volunteer Spotlight"}
-                      </span>
-
-                      {isOfficial && (
-                        <form
-                          action={async () => {
-                            "use server";
-                            await deleteAchievement(item.id);
-                          }}
-                        >
-                          <button
-                            type="submit"
-                            title="Delete achievement"
-                            className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </form>
-                      )}
-                    </div>
-                  </div>
-
-                  <h3 className="font-bold text-sm sm:text-base text-slate-900 leading-snug mb-1.5">
-                    {item.title}
-                  </h3>
-
-                  {item.description && (
-                    <p className="text-xs text-slate-600 leading-relaxed mb-3">
-                      {item.description}
-                    </p>
-                  )}
-
-                  {profile && (
-                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 mb-3 flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-blue-100 text-brandblue flex items-center justify-center text-[10px] font-bold shrink-0">
-                        {profile.full_name?.charAt(0) || "V"}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-xs font-bold text-slate-800 truncate">
-                          {profile.full_name}
-                        </div>
-                        <div className="text-[10px] text-slateink truncate">
-                          {profile.department ? `${profile.department} ` : ""}
-                          {profile.year ? `· Acad Year ${profile.year}` : ""}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slateink">
-                  <span className="flex items-center gap-1">
-                    <CalendarDays size={12} />
-                    {new Date(item.achieved_on).toLocaleDateString("en-IN", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </span>
-                  <span className="font-semibold text-emerald-700">Official NSS Honor</span>
-                </div>
-              </div>
-            );
-          })}
+          {items.map((item: any) => (
+            <AchievementCard key={item.id} item={item} isOfficial={isOfficial} />
+          ))}
         </div>
 
         {items.length === 0 && (

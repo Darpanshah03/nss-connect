@@ -25,34 +25,6 @@ async function verifyOfficial() {
   return { supabase, user };
 }
 
-export async function setProfilePhoto(userId: string, formData: FormData) {
-  const { supabase } = await verifyOfficial();
-
-  const photoFile = formData.get("photo") as File | null;
-  if (!photoFile || photoFile.size === 0) {
-    throw new Error("No photo selected.");
-  }
-
-  const ext = photoFile.name.split(".").pop();
-  const path = `profiles/${userId}.${ext}`;
-  const { error: uploadErr } = await supabase.storage
-    .from("nss-media")
-    .upload(path, photoFile, { contentType: photoFile.type, upsert: true });
-  if (uploadErr) throw new Error(`Photo upload failed: ${uploadErr.message}`);
-
-  const { data: publicUrlData } = supabase.storage.from("nss-media").getPublicUrl(path);
-
-  const { error } = await supabase
-    .from("profiles")
-    .update({ photo_url: publicUrlData.publicUrl })
-    .eq("id", userId);
-  if (error) throw new Error(error.message);
-
-  revalidatePath("/official/volunteers");
-  revalidatePath("/team");
-}
-
-
 export async function setPosition(userId: string, position: string | null) {
   const { supabase } = await verifyOfficial();
 
@@ -81,8 +53,6 @@ export async function setTenureYear(
     throw new Error("Tenure year must be 1 or 2.");
   }
 
-  // Only the Year 1 -> Year 2 promotion is gated. Moving back to Year 1
-  // (a correction) is never blocked.
   if (tenureYear === 2) {
     const result = await checkYearEligibility(supabase, userId, 1, false);
     if (!result.eligible) {
@@ -127,8 +97,6 @@ export async function setVolunteerStatus(
   return { success: true };
 }
 
-// Official adds real bonus/adjustment hours to a specific category,
-// to close an actual gap (e.g. hours earned outside the app's own tracking).
 export async function addHourAdjustment(
   userId: string,
   nssYear: 1 | 2,
@@ -159,9 +127,85 @@ export async function addHourAdjustment(
   revalidatePath("/official/volunteers");
 }
 
-// Creates a real login account directly — the official sets the password
-// themselves and hands it to the volunteer. No email is sent, so this
-// doesn't depend on Resend/SMTP being configured at all.
+export async function deleteVolunteerPermanently(userId: string) {
+  const { supabase, user } = await verifyOfficial();
+
+  if (userId === user.id) {
+    throw new Error("You cannot delete your own official account.");
+  }
+
+  const { data: targetRole } = await supabase
+    .from("roles")
+    .select("role")
+    .eq("user_id", userId)
+    .single();
+
+  if (targetRole?.role === "official") {
+    throw new Error(
+      "Official accounts can't be permanently deleted from this panel. Change their role to core/volunteer first if this is intentional."
+    );
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.deleteUser(userId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/official/volunteers");
+  revalidatePath("/team");
+}
+
+// Uploads BOTH the cropped photo (shown on the Team card) and the original,
+// uncropped photo (shown in the lightbox when someone clicks a core
+// member's card). "photo" = cropped blob, "photo_original" = the raw file
+// the official originally picked.
+export async function setProfilePhoto(userId: string, formData: FormData) {
+  const { supabase } = await verifyOfficial();
+
+  const croppedFile = formData.get("photo") as File | null;
+  const originalFile = formData.get("photo_original") as File | null;
+  if (!croppedFile || croppedFile.size === 0) {
+    throw new Error("No photo selected.");
+  }
+
+  const croppedPath = `profiles/${userId}-cropped.jpg`;
+  const { error: croppedErr } = await supabase.storage
+    .from("nss-media")
+    .upload(croppedPath, croppedFile, { contentType: "image/jpeg", upsert: true });
+  if (croppedErr) throw new Error(`Photo upload failed: ${croppedErr.message}`);
+  const { data: croppedUrlData } = supabase.storage.from("nss-media").getPublicUrl(croppedPath);
+
+  let originalUrl: string | null = null;
+  if (originalFile && originalFile.size > 0) {
+    const ext = originalFile.name.split(".").pop() || "jpg";
+    const originalPath = `profiles/${userId}-original.${ext}`;
+    const { error: originalErr } = await supabase.storage
+      .from("nss-media")
+      .upload(originalPath, originalFile, { contentType: originalFile.type, upsert: true });
+    if (originalErr) throw new Error(`Original photo upload failed: ${originalErr.message}`);
+    const { data: originalUrlData } = supabase.storage.from("nss-media").getPublicUrl(originalPath);
+    originalUrl = originalUrlData.publicUrl;
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      photo_url: croppedUrlData.publicUrl,
+      ...(originalUrl ? { photo_url_original: originalUrl } : {}),
+    })
+    .eq("id", userId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/official/volunteers");
+  revalidatePath("/team");
+}
+
+// Creates a real login account directly. Uses upsert (not update) for the
+// profile/role rows since the live database doesn't have the
+// on_auth_user_created trigger installed — nothing creates those rows
+// automatically at signup. Previously this used .update(), which silently
+// did nothing until the volunteer's first login triggered getViewer()'s
+// own fallback, so newly created accounts didn't show up in the
+// volunteers list until then. Upsert works whether or not a row exists.
 export async function createVolunteerAccount(formData: FormData) {
   const { supabase } = await verifyOfficial();
 
@@ -199,57 +243,28 @@ export async function createVolunteerAccount(formData: FormData) {
 
   const { error: profileErr } = await supabase
     .from("profiles")
-    .update({
+    .upsert({
+      id: newUserId,
       full_name: fullName,
       department,
       year,
       tenure_year: tenureYear,
+      status: "active",
       phone,
       roll_number: rollNumber,
-    })
-    .eq("id", newUserId);
+    });
 
   if (profileErr) throw new Error(profileErr.message);
 
-  if (position) {
-    const { error: roleErr } = await supabase
-      .from("roles")
-      .update({ role: "core", position })
-      .eq("user_id", newUserId);
-    if (roleErr) throw new Error(roleErr.message);
-  }
-
-  revalidatePath("/official/volunteers");
-  revalidatePath("/team");
-}
-
-// Permanently deletes the auth account. Because profiles.id references
-// auth.users(id) on delete cascade, this cascades through profiles ->
-// roles/registrations/attendance/hour_adjustments/camp_attendance
-// automatically. achievements.user_id is "on delete set null" instead,
-// so unit-level achievement records survive with the attribution cleared.
-// This is irreversible — the modal requires typing the volunteer's name
-// to confirm before calling this.
-export async function deleteVolunteerPermanently(userId: string) {
-  const { supabase, user } = await verifyOfficial();
-
-  if (userId === user.id) {
-    throw new Error("You cannot delete your own official account.");
-  }
-
-  const { data: targetRole } = await supabase
+  const { error: roleErr } = await supabase
     .from("roles")
-    .select("role")
-    .eq("user_id", userId)
-    .single();
+    .upsert({
+      user_id: newUserId,
+      role: position ? "core" : "volunteer",
+      position: position || null,
+    }, { onConflict: "user_id" });
 
-  if (targetRole?.role === "official") {
-    throw new Error("You cannot delete another official's account.");
-  }
-
-  const admin = createAdminClient();
-  const { error } = await admin.auth.admin.deleteUser(userId);
-  if (error) throw new Error(error.message);
+  if (roleErr) throw new Error(roleErr.message);
 
   revalidatePath("/official/volunteers");
   revalidatePath("/team");
