@@ -1,3 +1,4 @@
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 
@@ -27,7 +28,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <ServiceWorkerRegister />
+        {children}
+      </body>
     </html>
   );
 }
