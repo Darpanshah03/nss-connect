@@ -154,10 +154,6 @@ export async function deleteVolunteerPermanently(userId: string) {
   revalidatePath("/team");
 }
 
-// Uploads BOTH the cropped photo (shown on the Team card) and the original,
-// uncropped photo (shown in the lightbox when someone clicks a core
-// member's card). "photo" = cropped blob, "photo_original" = the raw file
-// the official originally picked.
 export async function setProfilePhoto(userId: string, formData: FormData) {
   const { supabase } = await verifyOfficial();
 
@@ -199,13 +195,43 @@ export async function setProfilePhoto(userId: string, formData: FormData) {
   revalidatePath("/team");
 }
 
-// Creates a real login account directly. Uses upsert (not update) for the
-// profile/role rows since the live database doesn't have the
-// on_auth_user_created trigger installed — nothing creates those rows
-// automatically at signup. Previously this used .update(), which silently
-// did nothing until the volunteer's first login triggered getViewer()'s
-// own fallback, so newly created accounts didn't show up in the
-// volunteers list until then. Upsert works whether or not a row exists.
+// Official-only, unrestricted editing of a volunteer's info fields — unlike
+// updateProfile (self-service, fill-empty-fields-only), this can change
+// any field at any time, e.g. to correct a typo or fill in something the
+// volunteer already locked in incorrectly.
+export async function updateVolunteerInfo(
+  userId: string,
+  updates: {
+    full_name?: string;
+    department?: string | null;
+    year?: number | null;
+    phone?: string | null;
+    roll_number?: string | null;
+  }
+) {
+  const { supabase } = await verifyOfficial();
+
+  const payload: Record<string, any> = {};
+  if (updates.full_name !== undefined) {
+    const trimmed = updates.full_name.trim();
+    if (!trimmed) throw new Error("Full name cannot be empty.");
+    payload.full_name = trimmed;
+  }
+  if (updates.department !== undefined) payload.department = updates.department?.trim() || null;
+  if (updates.year !== undefined) payload.year = updates.year;
+  if (updates.phone !== undefined) payload.phone = updates.phone?.trim() || null;
+  if (updates.roll_number !== undefined) payload.roll_number = updates.roll_number?.trim() || null;
+
+  if (Object.keys(payload).length === 0) return;
+
+  const { error } = await supabase.from("profiles").update(payload).eq("id", userId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/official/volunteers");
+  revalidatePath("/team");
+  revalidatePath("/profile");
+}
+
 export async function createVolunteerAccount(formData: FormData) {
   const { supabase } = await verifyOfficial();
 

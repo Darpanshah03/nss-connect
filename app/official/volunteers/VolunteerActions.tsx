@@ -8,6 +8,7 @@ import {
   addHourAdjustment,
   deleteVolunteerPermanently,
   setProfilePhoto,
+  updateVolunteerInfo,
 } from "./actions";
 import { EVENT_CATEGORIES } from "@/lib/eventCategories";
 import type { EligibilityResult } from "@/lib/hoursEligibility";
@@ -24,6 +25,7 @@ import {
   PlusCircle,
   Trash2,
   Camera,
+  Pencil,
 } from "lucide-react";
 
 type BlockedAction =
@@ -33,6 +35,10 @@ type BlockedAction =
 export default function VolunteerActions({
   userId,
   fullName,
+  department,
+  phone,
+  rollNumber,
+  year,
   currentPosition,
   tenureYear,
   status,
@@ -40,6 +46,10 @@ export default function VolunteerActions({
 }: {
   userId: string;
   fullName: string;
+  department: string | null;
+  phone: string | null;
+  rollNumber: string | null;
+  year: number | null;
   currentPosition: string | null;
   tenureYear: number;
   status: "active" | "graduated" | "removed";
@@ -60,10 +70,18 @@ export default function VolunteerActions({
   const [deleteTyped, setDeleteTyped] = useState("");
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Core member profile photo — pick -> crop -> upload
   const [photoOpen, setPhotoOpen] = useState(false);
   const [rawPhotoFile, setRawPhotoFile] = useState<File | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
+
+  // Edit Info — official can change any field, anytime
+  const [editOpen, setEditOpen] = useState(false);
+  const [editFullName, setEditFullName] = useState(fullName);
+  const [editDepartment, setEditDepartment] = useState(department ?? "");
+  const [editPhone, setEditPhone] = useState(phone ?? "");
+  const [editRollNumber, setEditRollNumber] = useState(rollNumber ?? "");
+  const [editYear, setEditYear] = useState(year ? String(year) : "");
+  const [editError, setEditError] = useState<string | null>(null);
 
   function handlePositionChange(val: string) {
     if (val === "__custom__") {
@@ -84,11 +102,11 @@ export default function VolunteerActions({
     });
   }
 
-  function handleTenureChange(year: number) {
+  function handleTenureChange(yr: number) {
     startTransition(async () => {
-      const result = await setTenureYear(userId, year);
+      const result = await setTenureYear(userId, yr);
       if (!result.success && result.eligibility) {
-        setBlocked({ kind: "promote", targetYear: year, nssYear: 1, eligibility: result.eligibility });
+        setBlocked({ kind: "promote", targetYear: yr, nssYear: 1, eligibility: result.eligibility });
       }
     });
   }
@@ -172,6 +190,28 @@ export default function VolunteerActions({
     });
   }
 
+  function handleEditSubmit() {
+    setEditError(null);
+    if (!editFullName.trim()) {
+      setEditError("Full name cannot be empty.");
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await updateVolunteerInfo(userId, {
+          full_name: editFullName,
+          department: editDepartment || null,
+          phone: editPhone || null,
+          roll_number: editRollNumber || null,
+          year: editYear ? parseInt(editYear) : null,
+        });
+        setEditOpen(false);
+      } catch (e: any) {
+        setEditError(e.message ?? "Could not save changes.");
+      }
+    });
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       {/* Position Selector */}
@@ -242,6 +282,17 @@ export default function VolunteerActions({
         </button>
       )}
 
+      {/* Edit Info — official can change any field, anytime */}
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => setEditOpen(true)}
+        title="Edit volunteer info"
+        className="text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 p-1.5 rounded-xl transition-colors"
+      >
+        <Pencil size={13} />
+      </button>
+
       {/* Permanent Delete */}
       <button
         type="button"
@@ -253,7 +304,7 @@ export default function VolunteerActions({
         <Trash2 size={13} />
       </button>
 
-      {/* Core member photo — only shown once they have a core position */}
+      {/* Core member photo */}
       {currentPosition && (
         <button
           type="button"
@@ -264,6 +315,104 @@ export default function VolunteerActions({
         >
           <Camera size={13} />
         </button>
+      )}
+
+      {/* Edit Info Modal */}
+      {editOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-5 max-w-sm w-full shadow-2xl border border-slate-100">
+            <h3 className="font-bold text-sm text-slate-900 mb-1">Edit Volunteer Info</h3>
+            <p className="text-xs text-slate-500 mb-3">
+              As an official, you can change any field here, including ones the volunteer already
+              filled in themselves.
+            </p>
+
+            {editError && (
+              <div className="text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg p-2 mb-2">
+                {editError}
+              </div>
+            )}
+
+            <div className="space-y-2.5">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Full Name</label>
+                <input
+                  type="text"
+                  value={editFullName}
+                  onChange={(e) => setEditFullName(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brandblue"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Department</label>
+                <input
+                  type="text"
+                  value={editDepartment}
+                  onChange={(e) => setEditDepartment(e.target.value)}
+                  placeholder="e.g. Computer Engineering"
+                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brandblue"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Academic Year</label>
+                  <select
+                    value={editYear}
+                    onChange={(e) => setEditYear(e.target.value)}
+                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brandblue bg-white"
+                  >
+                    <option value="">Not set</option>
+                    <option value="1">1st Year</option>
+                    <option value="2">2nd Year</option>
+                    <option value="3">3rd Year</option>
+                    <option value="4">4th Year</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Phone</label>
+                  <input
+                    type="tel"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    placeholder="+91 ..."
+                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brandblue"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Roll / PRN Number</label>
+                <input
+                  type="text"
+                  value={editRollNumber}
+                  onChange={(e) => setEditRollNumber(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brandblue"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditOpen(false);
+                  setEditError(null);
+                }}
+                className="flex-1 border border-slate-200 rounded-xl py-2 text-xs font-semibold text-slate-600"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={handleEditSubmit}
+                className="flex-1 bg-brandblue hover:bg-brandblueDark text-white rounded-xl py-2 text-xs font-bold flex items-center justify-center gap-1.5"
+              >
+                {pending ? <Loader2 size={13} className="animate-spin" /> : null}
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Custom Position Modal */}
@@ -305,7 +454,7 @@ export default function VolunteerActions({
         </div>
       )}
 
-      {/* Photo pick step (crop step renders separately once a file is chosen) */}
+      {/* Photo pick step */}
       {photoOpen && !rawPhotoFile && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl p-5 max-w-sm w-full shadow-2xl border border-slate-100">

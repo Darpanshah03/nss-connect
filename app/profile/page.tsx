@@ -11,14 +11,15 @@ import {
   Clock,
   LogOut,
   Save,
-  ShieldAlert,
-  Hash,
-  Phone,
-  BookOpen,
+  Lock,
   CheckCircle2,
   XCircle,
   Tent,
 } from "lucide-react";
+
+function isEmpty(v: any) {
+  return v === null || v === undefined || v === "";
+}
 
 export default async function ProfilePage() {
   const viewer = await getViewer();
@@ -33,6 +34,13 @@ export default async function ProfilePage() {
     (viewer.tenureYear === 2 ? 2 : 1) as 1 | 2,
     true
   );
+
+  const anyEditable =
+    isEmpty(viewer.fullName) ||
+    isEmpty(viewer.department) ||
+    isEmpty(viewer.year) ||
+    isEmpty(viewer.phone) ||
+    isEmpty(viewer.rollNumber);
 
   return (
     <div className="md:flex min-h-screen bg-[#F8FAFC]">
@@ -160,88 +168,129 @@ export default async function ProfilePage() {
 
         {/* Edit Info Form */}
         <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-xs mb-6">
-          <h3 className="font-bold text-sm sm:text-base text-slate-900 mb-4 flex items-center gap-2">
+          <h3 className="font-bold text-sm sm:text-base text-slate-900 mb-1 flex items-center gap-2">
             <User size={16} className="text-brandblue" />
-            Edit Profile Information
+            Your Info
           </h3>
+          <p className="text-xs text-slateink mb-4">
+            You can fill in any detail that's currently blank. Once a field is saved, it's locked —
+            contact your NSS official to correct it after that.
+          </p>
 
           <form action={updateProfile} className="space-y-4">
+            {/* Full Name */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Full Name *
-              </label>
-              <input
-                name="full_name"
-                defaultValue={viewer.fullName}
-                required
-                className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 outline-none focus:border-brandblue"
-              />
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
+              {isEmpty(viewer.fullName) ? (
+                <input
+                  name="full_name"
+                  required
+                  placeholder="Your full name"
+                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 outline-none focus:border-brandblue"
+                />
+              ) : (
+                <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-700">
+                  <span>{viewer.fullName}</span>
+                  <Lock size={13} className="text-slate-400 shrink-0" />
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Department */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Department
-                </label>
-                <input
-                  name="department"
-                  defaultValue={viewer.department ?? ""}
-                  placeholder="e.g. Information Technology"
-                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 outline-none focus:border-brandblue"
-                />
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Department</label>
+                {isEmpty(viewer.department) ? (
+                  <input
+                    name="department"
+                    placeholder="e.g. Information Technology"
+                    className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 outline-none focus:border-brandblue"
+                  />
+                ) : (
+                  <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-700">
+                    <span>{viewer.department}</span>
+                    <Lock size={13} className="text-slate-400 shrink-0" />
+                  </div>
+                )}
               </div>
 
+              {/* Academic Year */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Academic Year
-                </label>
-                <select
-                  name="year"
-                  defaultValue={viewer.year?.toString() ?? "1"}
-                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 outline-none focus:border-brandblue bg-white"
-                >
-                  <option value="1">1st Year</option>
-                  <option value="2">2nd Year</option>
-                  <option value="3">3rd Year</option>
-                  <option value="4">4th Year</option>
-                </select>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Academic Year</label>
+                {isEmpty(viewer.year) ? (
+                  <select
+                    name="year"
+                    defaultValue=""
+                    className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 outline-none focus:border-brandblue bg-white"
+                  >
+                    <option value="" disabled>
+                      Select year
+                    </option>
+                    <option value="1">1st Year</option>
+                    <option value="2">2nd Year</option>
+                    <option value="3">3rd Year</option>
+                    <option value="4">4th Year</option>
+                  </select>
+                ) : (
+                  <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-700">
+                    <span>Year {viewer.year}</span>
+                    <Lock size={13} className="text-slate-400 shrink-0" />
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Phone */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Phone Number
-                </label>
-                <input
-                  name="phone"
-                  type="tel"
-                  defaultValue={viewer.phone ?? ""}
-                  placeholder="+91 98765 43210"
-                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 outline-none focus:border-brandblue"
-                />
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Phone Number</label>
+                {isEmpty(viewer.phone) ? (
+                  <input
+                    name="phone"
+                    type="tel"
+                    placeholder="+91 98765 43210"
+                    className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 outline-none focus:border-brandblue"
+                  />
+                ) : (
+                  <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-700">
+                    <span>{viewer.phone}</span>
+                    <Lock size={13} className="text-slate-400 shrink-0" />
+                  </div>
+                )}
               </div>
 
+              {/* Roll Number */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Roll / PRN Number
-                </label>
-                <input
-                  name="roll_number"
-                  defaultValue={viewer.rollNumber ?? ""}
-                  placeholder="e.g. IT2024045"
-                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 outline-none focus:border-brandblue"
-                />
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Roll / PRN Number</label>
+                {isEmpty(viewer.rollNumber) ? (
+                  <input
+                    name="roll_number"
+                    placeholder="e.g. IT2024045"
+                    className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 outline-none focus:border-brandblue"
+                  />
+                ) : (
+                  <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-700">
+                    <span>{viewer.rollNumber}</span>
+                    <Lock size={13} className="text-slate-400 shrink-0" />
+                  </div>
+                )}
               </div>
             </div>
 
-            <button
-              type="submit"
-              className="bg-brandblue hover:bg-brandblueDark text-white rounded-xl px-6 py-2.5 text-xs font-bold shadow-xs transition-all flex items-center gap-1.5"
-            >
-              <Save size={14} />
-              Save Profile
-            </button>
+            {anyEditable ? (
+              <button
+                type="submit"
+                className="bg-brandblue hover:bg-brandblueDark text-white rounded-xl px-6 py-2.5 text-xs font-bold shadow-xs transition-all flex items-center gap-1.5"
+              >
+                <Save size={14} />
+                Save Info
+              </button>
+            ) : (
+              <p className="text-[11px] text-slateink flex items-center gap-1.5">
+                <Lock size={12} />
+                All fields are filled in. Contact your NSS official to change anything above.
+              </p>
+            )}
           </form>
         </div>
 

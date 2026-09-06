@@ -15,7 +15,7 @@ import {
   Phone,
   Hash,
 } from "lucide-react";
-import ExportButton from "../../../components/ExportButton";
+import ExportButton from "@/components/ExportButton";
 
 const POSITIONS = [
   "NSS Leader",
@@ -59,7 +59,6 @@ export default async function VolunteersPage({
     hoursByUser.set(a.user_id, (hoursByUser.get(a.user_id) ?? 0) + Number(a.hours))
   );
 
-  // Filter out the official account itself from the volunteer list
   const allVolunteers = (profiles ?? []).filter((p) => {
     const r = roleByUser.get(p.id);
     return r?.role !== "official";
@@ -73,7 +72,6 @@ export default async function VolunteersPage({
     (v) => v.status === "active" && roleByUser.get(v.id)?.role === "core"
   ).length;
   const graduatedCount = allVolunteers.filter((v) => v.status === "graduated").length;
-  const removedCount = allVolunteers.filter((v) => v.status === "removed").length;
 
   const filteredVolunteers = allVolunteers.filter((v) => {
     const role = roleByUser.get(v.id);
@@ -99,7 +97,6 @@ export default async function VolunteersPage({
     <div className="md:flex min-h-screen bg-[#F8FAFC]">
       <Nav viewer={viewer} />
       <main className="flex-1 w-full px-4 pt-16 pb-24 md:px-8 md:py-8 md:pb-8 max-w-5xl">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
@@ -128,7 +125,6 @@ export default async function VolunteersPage({
           </div>
         </div>
 
-        {/* Stats Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 mb-6">
           <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-2xs">
             <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Active Volunteers</div>
@@ -155,9 +151,7 @@ export default async function VolunteersPage({
           </div>
         </div>
 
-        {/* Filters and Search Bar */}
         <div className="bg-white border border-slate-200 rounded-2xl p-3 mb-6 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
-          {/* Tabs */}
           <div className="flex items-center gap-1 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 scrollbar-none">
             {[
               { key: "active", label: "Active" },
@@ -186,7 +180,6 @@ export default async function VolunteersPage({
           </div>
         </div>
 
-        {/* Volunteers List / Cards */}
         <div className="space-y-3">
           {filteredVolunteers.map((p) => {
             const role = roleByUser.get(p.id);
@@ -247,7 +240,6 @@ export default async function VolunteersPage({
                 </div>
 
                 <div className="shrink-0 flex flex-col sm:flex-row sm:items-center gap-3 pt-3 md:pt-0 border-t md:border-t-0 border-slate-100">
-                  {/* Hours pill */}
                   <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
                     <span className="text-[10px] uppercase font-bold text-slate-500">Hours:</span>
                     <span className="font-mono font-bold text-sm text-brandblue">
@@ -255,10 +247,13 @@ export default async function VolunteersPage({
                     </span>
                   </div>
 
-                  {/* Lifecycle & Position Controls */}
                   <VolunteerActions
                     userId={p.id}
                     fullName={p.full_name}
+                    department={p.department ?? null}
+                    phone={p.phone ?? null}
+                    rollNumber={p.roll_number ?? null}
+                    year={p.year ?? null}
                     currentPosition={role?.position ?? null}
                     tenureYear={p.tenure_year ?? 1}
                     status={p.status ?? "active"}
