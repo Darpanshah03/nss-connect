@@ -14,8 +14,6 @@ export type Viewer = {
   position: string | null;
 } | null;
 
-// Fetches the logged-in user's profile + role in one call.
-// Returns null if nobody is logged in — callers should redirect to /login.
 export async function getViewer(): Promise<Viewer> {
   const supabase = createClient();
   const {
@@ -23,7 +21,7 @@ export async function getViewer(): Promise<Viewer> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  let [{ data: profile }, { data: role }] = await Promise.all([
+  let [{ data: profile, error: profileError }, { data: role, error: roleError }] = await Promise.all([
     supabase
       .from("profiles")
       .select("full_name, department, year, tenure_year, status, phone, roll_number")
@@ -32,8 +30,24 @@ export async function getViewer(): Promise<Viewer> {
     supabase.from("roles").select("role, position").eq("user_id", user.id).single(),
   ]);
 
-  // If profile doesn't exist yet, initialize it
-  if (!profile) {
+  // PGRST116 = "no rows found" from .single() — this is the ONLY case where
+  // it's actually safe to assume the row genuinely doesn't exist yet and
+  // create a default. Any other error code means the read failed for some
+  // other reason (network blip, connection pool issue, etc.) — in that
+  // case we must NOT overwrite anything, since doing so could silently
+  // downgrade a real official/core account back to 'volunteer' the moment
+  // an unrelated, transient read failure happens to occur.
+  const profileGenuinelyMissing = profileError?.code === "PGRST116";
+  const roleGenuinelyMissing = roleError?.code === "PGRST116";
+
+  if (profileError && !profileGenuinelyMissing) {
+    throw new Error(`Could not load profile: ${profileError.message}`);
+  }
+  if (roleError && !roleGenuinelyMissing) {
+    throw new Error(`Could not load role: ${roleError.message}`);
+  }
+
+  if (profileGenuinelyMissing) {
     const defaultName =
       user.user_metadata?.full_name || user.email?.split("@")[0] || "Volunteer";
     await supabase.from("profiles").upsert({
@@ -53,8 +67,7 @@ export async function getViewer(): Promise<Viewer> {
     };
   }
 
-  // If role doesn't exist yet, initialize it
-  if (!role) {
+  if (roleGenuinelyMissing) {
     await supabase.from("roles").upsert({
       user_id: user.id,
       role: "volunteer",
@@ -79,5 +92,3 @@ export async function getViewer(): Promise<Viewer> {
     position: role?.position ?? null,
   };
 }
-
-

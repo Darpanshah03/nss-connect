@@ -1,8 +1,71 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --paper: 247 248 250;
+  --surface: 255 255 255;
+  --surface-2: 241 244 249;
+  --steel: 228 233 242;
+  --ink: 10 26 63;
+  --saffron: 255 122 26;
+  --green: 15 138 75;
+  --wheelred: 200 30 44;
+}
+
+.dark {
+  --paper: 10 12 20;
+  --surface: 17 20 32;
+  --surface-2: 24 28 44;
+  --steel: 40 46 68;
+  --ink: 237 240 247;
+  --saffron: 255 143 56;
+  --green: 46 191 122;
+  --wheelred: 255 99 99;
+}
+
+html {
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
 body {
-  background: #f1f3f6;
-  color: #10172a;
+  background: rgb(var(--paper));
+  color: rgb(var(--ink));
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* UI Jar-style dotted texture — apply once, behind the app shell only */
+.dotted-bg {
+  background-image: radial-gradient(rgb(var(--ink) / 0.12) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+.chakra-motif {
+  position: relative;
+}
+.chakra-motif::before {
+  content: "";
+  position: absolute;
+  top: -30%;
+  right: -10%;
+  width: 240px;
+  height: 240px;
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgb(var(--saffron) / 0.1) 0deg 3deg,
+    transparent 3deg 15deg
+  );
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  flex-shrink: 0;
 }

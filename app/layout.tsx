@@ -1,6 +1,7 @@
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 export const metadata: Metadata = {
   title: "NSS Connect",
@@ -22,15 +23,17 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: "cover",
-  themeColor: "#E8542C",
+  themeColor: "#FF7A1A",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
         <ServiceWorkerRegister />
-        {children}
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

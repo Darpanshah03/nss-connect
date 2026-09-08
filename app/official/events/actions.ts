@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-async function verifyOfficial() {
+export async function postEvent(formData: FormData) {
   const supabase = createClient();
   const {
     data: { user },
@@ -17,12 +17,6 @@ async function verifyOfficial() {
     .single();
   if (role?.role !== "official")
     throw new Error("Only official accounts can manage events.");
-
-  return { supabase, user };
-}
-
-export async function postEvent(formData: FormData) {
-  const { supabase, user } = await verifyOfficial();
 
   const title = (formData.get("title") as string)?.trim();
   const description = (formData.get("description") as string)?.trim() || null;
@@ -56,21 +50,99 @@ export async function postEvent(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+// Officials can correct any field of an already-posted event — a typo in
+// the title, a wrong date, an updated venue, etc. Does not touch status,
+// registrations, or attendance; those stay exactly as they were.
+export async function updateEvent(eventId: string, formData: FormData) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not signed in");
+
+  const { data: role } = await supabase
+    .from("roles")
+    .select("role")
+    .eq("user_id", user.id)
+    .single();
+  if (role?.role !== "official")
+    throw new Error("Only official accounts can manage events.");
+
+  const title = (formData.get("title") as string)?.trim();
+  const description = (formData.get("description") as string)?.trim() || null;
+  const category = (formData.get("category") as string)?.trim() || "General";
+  const eventDate = formData.get("event_date") as string;
+  const eventTime = (formData.get("event_time") as string)?.trim() || null;
+  const location = (formData.get("location") as string)?.trim();
+  const capacity = Number(formData.get("capacity")) || 30;
+  const hoursValue = Number(formData.get("hours_value")) || 0;
+
+  if (!title || !eventDate || !location) {
+    throw new Error("Title, event date, and location are required.");
+  }
+
+  const { error } = await supabase
+    .from("events")
+    .update({
+      title,
+      description,
+      category,
+      event_date: eventDate,
+      event_time: eventTime,
+      location,
+      capacity,
+      hours_value: hoursValue,
+    })
+    .eq("id", eventId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/official/events");
+  revalidatePath("/events");
+  revalidatePath(`/official/attendance/${eventId}`);
+  revalidatePath("/dashboard");
+}
+
 export async function deleteEvent(eventId: string) {
-  const { supabase } = await verifyOfficial();
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not signed in");
+
+  const { data: role } = await supabase
+    .from("roles")
+    .select("role")
+    .eq("user_id", user.id)
+    .single();
+  if (role?.role !== "official")
+    throw new Error("Only official accounts can manage events.");
 
   const { error } = await supabase.from("events").delete().eq("id", eventId);
   if (error) throw new Error(error.message);
 
   revalidatePath("/official/events");
   revalidatePath("/events");
+  revalidatePath("/dashboard");
 }
 
 export async function updateEventStatus(
   eventId: string,
   status: "upcoming" | "past" | "cancelled"
 ) {
-  const { supabase } = await verifyOfficial();
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not signed in");
+
+  const { data: role } = await supabase
+    .from("roles")
+    .select("role")
+    .eq("user_id", user.id)
+    .single();
+  if (role?.role !== "official")
+    throw new Error("Only official accounts can manage events.");
 
   const { error } = await supabase
     .from("events")
@@ -82,4 +154,3 @@ export async function updateEventStatus(
   revalidatePath("/official/events");
   revalidatePath("/events");
 }
-
