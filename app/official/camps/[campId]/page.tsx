@@ -29,7 +29,7 @@ export default async function CampAttendancePage({ params }: { params: { campId:
   return (
     <div className="md:flex min-h-screen bg-[#F8FAFC]">
       <Nav viewer={viewer} />
-      <main className="flex-1 w-full px-4 pt-16 pb-24 md:px-8 md:py-8 md:pb-8 max-w-3xl">
+      <main className="min-w-0 flex-1 px-4 pt-16 pb-24 md:px-8 md:py-8 md:pb-8">
         <Link href="/official/camps" className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-brandblue mb-4 transition-colors">
           <ArrowLeft size={14} /> Back to Special Camps
         </Link>

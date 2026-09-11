@@ -93,7 +93,7 @@ export default async function VolunteersPage({
   return (
     <div className="md:flex min-h-screen bg-paper">
       <Nav viewer={viewer} />
-      <main className="flex-1 w-full px-4 pt-16 pb-24 md:px-8 md:py-8 md:pb-8 max-w-5xl">
+      <main className="min-w-0 flex-1 px-4 pt-16 pb-24 md:px-8 md:py-8 md:pb-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
           <div>

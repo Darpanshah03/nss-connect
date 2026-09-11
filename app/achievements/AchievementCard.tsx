@@ -35,11 +35,13 @@ export default function AchievementCard({ item, isOfficial }: { item: any; isOff
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="text-left w-full bg-white border border-slate-200/90 rounded-3xl p-5 shadow-xs hover:border-slate-300 transition-all flex flex-col justify-between relative overflow-hidden"
-      >
+      <article className="relative flex w-full flex-col justify-between overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-5 text-left shadow-xs transition-all hover:border-slate-300">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="absolute inset-0 z-0 rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brandblue"
+          aria-label={`View achievement: ${item.title}`}
+        />
         <div
           className={`absolute top-0 inset-x-0 h-1.5 ${
             isUnit
@@ -48,7 +50,7 @@ export default function AchievementCard({ item, isOfficial }: { item: any; isOff
           }`}
         />
 
-        <div>
+        <div className="relative z-10 pointer-events-none">
           {item.photo_url && (
             <img
               src={item.photo_url}
@@ -78,7 +80,7 @@ export default function AchievementCard({ item, isOfficial }: { item: any; isOff
                   onClick={handleDelete}
                   disabled={pending}
                   title="Delete achievement"
-                  className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                  className="pointer-events-auto relative z-20 rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
                 >
                   <Trash2 size={13} />
                 </button>
@@ -112,7 +114,7 @@ export default function AchievementCard({ item, isOfficial }: { item: any; isOff
           )}
         </div>
 
-        <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slateink">
+        <div className="relative z-10 pointer-events-none pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slateink">
           <span className="flex items-center gap-1">
             <CalendarDays size={12} />
             {new Date(item.achieved_on).toLocaleDateString("en-IN", {
@@ -123,7 +125,7 @@ export default function AchievementCard({ item, isOfficial }: { item: any; isOff
           </span>
           <span className="font-semibold text-emerald-700">Official NSS Honor</span>
         </div>
-      </button>
+      </article>
 
       {open && (
         <div

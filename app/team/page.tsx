@@ -61,7 +61,7 @@ export default async function TeamPage() {
   return (
     <div className="md:flex min-h-screen bg-[#F8FAFC]">
       <Nav viewer={viewer} />
-      <main className="flex-1 w-full px-4 pt-16 pb-24 md:px-8 md:py-8 md:pb-8 max-w-4xl">
+      <main className="min-w-0 flex-1 px-4 pt-16 pb-24 md:px-8 md:py-8 md:pb-8">
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-1">
             <span className="p-1.5 bg-blue-100 text-brandblue rounded-xl">

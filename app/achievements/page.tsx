@@ -39,9 +39,9 @@ export default async function AchievementsPage({
   const items = achievements ?? [];
 
   return (
-    <div className="md:flex min-h-screen bg-[#F8FAFC]">
+    <div className="min-h-screen bg-[#F8FAFC] md:flex">
       <Nav viewer={viewer} />
-      <main className="flex-1 w-full px-4 pt-16 pb-24 md:px-8 md:py-8 md:pb-8 max-w-4xl">
+      <main className="min-w-0 flex-1 px-4 pt-16 pb-24 md:px-8 md:py-8 md:pb-8">
         {/* Page Header */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-1">

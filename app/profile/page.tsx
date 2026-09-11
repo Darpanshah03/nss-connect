@@ -45,7 +45,7 @@ export default async function ProfilePage() {
   return (
     <div className="md:flex min-h-screen bg-[#F8FAFC]">
       <Nav viewer={viewer} />
-      <main className="flex-1 w-full px-4 pt-16 pb-24 md:px-8 md:py-8 md:pb-8 max-w-2xl">
+      <main className="min-w-0 flex-1 px-4 pt-16 pb-24 md:px-8 md:py-8 md:pb-8">
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Your Volunteer Profile</h1>

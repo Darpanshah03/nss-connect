@@ -2,220 +2,317 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { Viewer } from "@/lib/getViewer";
-import ThemeToggle from "./ThemeToggle";
+import { useState } from "react";
+
 import {
   LayoutDashboard,
   CalendarDays,
   Users,
-  Trophy,
-  UserCheck,
-  LogOut,
-  ShieldAlert,
-  Sparkles,
-  GraduationCap,
   Tent,
+  Award,
+  Menu,
+  X,
+  LogOut,
+  ChevronRight,
+  UserRound,
 } from "lucide-react";
 
-function ChakraMark({ className }: { className?: string }) {
-  const spokes = Array.from({ length: 16 }, (_, i) => (i * 360) / 16);
-  return (
-    <svg viewBox="0 0 40 40" className={className} aria-hidden="true">
-      <circle cx="20" cy="20" r="19" className="fill-ink" />
-      {spokes.map((angle) => (
-        <line
-          key={angle}
-          x1="20"
-          y1="20"
-          x2={20 + 14 * Math.cos((angle * Math.PI) / 180)}
-          y2={20 + 14 * Math.sin((angle * Math.PI) / 180)}
-          className="stroke-saffron"
-          strokeWidth="1"
-          opacity={0.9}
-        />
-      ))}
-      <circle cx="20" cy="20" r="3.5" className="fill-saffron" />
-    </svg>
-  );
-}
+import type { Viewer } from "@/lib/getViewer";
 
-export default function Nav({ viewer }: { viewer: NonNullable<Viewer> }) {
+/* =========================================================
+   VOLUNTEER + CORE NAVIGATION
+   Exactly 6 options
+========================================================= */
+
+const volunteerItems = [
+  {
+    name: "Dashboard",
+    href: "/dashboard",
+    icon: LayoutDashboard,
+  },
+  {
+    name: "Events",
+    href: "/events",
+    icon: CalendarDays,
+  },
+  {
+    name: "Camps",
+    href: "/official/camps",
+    icon: Tent,
+  },
+  {
+    name: "Achievements",
+    href: "/achievements",
+    icon: Award,
+  },
+  {
+    name: "NSS Team",
+    href: "/team",
+    icon: UserRound,
+  },
+  {
+    name: "Profile",
+    href: "/profile",
+    icon: UserRound,
+  },
+];
+
+/* =========================================================
+   ADMIN / OFFICIAL NAVIGATION
+   Exactly 5 options
+========================================================= */
+
+const officialItems = [
+  {
+    name: "Events",
+    href: "/official/events",
+    icon: CalendarDays,
+  },
+  {
+    name: "Volunteers",
+    href: "/official/volunteers",
+    icon: Users,
+  },
+  {
+    name: "Camps",
+    href: "/official/camps",
+    icon: Tent,
+  },
+  {
+    name: "Achievements",
+    href: "/achievements",
+    icon: Award,
+  },
+  {
+    name: "NSS Team",
+    href: "/team",
+    icon: UserRound,
+  },
+];
+
+export default function Nav({
+  viewer,
+}: {
+  viewer: NonNullable<Viewer>;
+}) {
   const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   const isOfficial = viewer.role === "official";
-  const isCore = viewer.role === "core";
 
-  const links = isOfficial
-    ? [
-        { href: "/official/events", label: "Events & Attendance", icon: CalendarDays },
-        { href: "/official/volunteers", label: "Volunteers & Tenure", icon: Users },
-        { href: "/official/camps", label: "Special Camps", icon: Tent },
-        { href: "/achievements", label: "Achievements", icon: Trophy },
-        { href: "/team", label: "Team Directory", icon: Sparkles },
-      ]
-    : [
-        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { href: "/events", label: "Events", icon: CalendarDays },
-        { href: "/achievements", label: "Achievements", icon: Trophy },
-        { href: "/team", label: "NSS Team", icon: Sparkles },
-        { href: "/profile", label: "Profile", icon: UserCheck },
-      ];
+  const items = isOfficial
+    ? officialItems
+    : volunteerItems;
 
-  const renderBadge = () => {
-    if (isOfficial) {
-      return (
-        <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-ink text-surface px-2.5 py-0.5 rounded-full">
-          <ShieldAlert size={12} className="shrink-0" />
-          Official Admin
-        </span>
-      );
-    }
-    if (isCore && viewer.position) {
-      return (
-        <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-saffron/15 text-ink border border-saffron/40 px-2.5 py-0.5 rounded-full">
-          <Sparkles size={12} className="shrink-0 text-saffron fill-saffron" />
-          {viewer.position}
-        </span>
-      );
-    }
-    if (viewer.status === "graduated") {
-      return (
-        <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-indigo-500/10 text-indigo-500 border border-indigo-500/30 px-2 py-0.5 rounded-full">
-          <GraduationCap size={12} className="shrink-0" />
-          Graduated
-        </span>
-      );
-    }
+  const sectionLabel = isOfficial
+    ? "Official"
+    : "Volunteer";
+
+  function NavLink({
+    href,
+    icon: Icon,
+    name,
+  }: {
+    href: string;
+    icon: React.ElementType;
+    name: string;
+  }) {
+    const active =
+      pathname === href ||
+      pathname.startsWith(`${href}/`);
+
     return (
-      <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-steel/60 text-ink/70 border border-steel px-2 py-0.5 rounded-full">
-        Year {viewer.tenureYear || 1} Volunteer
-      </span>
+      <Link
+        href={href}
+        onClick={() => setMobileOpen(false)}
+        className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+          active
+            ? "bg-saffron/10 text-saffron shadow-sm ring-1 ring-saffron/20"
+            : "text-navy/60 hover:bg-steel/60 hover:text-navy"
+        }`}
+      >
+        <Icon
+          className={`h-5 w-5 shrink-0 ${
+            active
+              ? "text-saffron"
+              : "text-navy/50 group-hover:text-navy"
+          }`}
+        />
+
+        <span>{name}</span>
+
+        {active && (
+          <ChevronRight className="ml-auto h-4 w-4 text-saffron/60" />
+        )}
+      </Link>
     );
-  };
+  }
+
+  function NavContent() {
+    return (
+      <div className="flex h-full flex-col">
+        {/* =====================================================
+            LOGO / BRAND
+        ===================================================== */}
+
+        <div className="flex items-center gap-3 px-4 py-6">
+          <div className="gradient-tricolour flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-md">
+            <span className="font-display text-lg font-bold">
+              N
+            </span>
+          </div>
+
+          <div className="min-w-0">
+            <h1 className="font-display text-lg font-bold leading-tight text-navy">
+              NSS
+            </h1>
+
+            <p className="text-xs text-navy/50">
+              VPPCOE&VA
+            </p>
+          </div>
+        </div>
+
+        {/* =====================================================
+            NAVIGATION
+        ===================================================== */}
+
+        <div className="flex-1 overflow-y-auto px-3 py-2">
+          <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-navy/40">
+            {sectionLabel}
+          </p>
+
+          <div className="space-y-1">
+            {items.map((item) => (
+              <NavLink
+                key={item.href}
+                {...item}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* =====================================================
+            USER CARD
+        ===================================================== */}
+
+        <div className="border-t border-steel p-3">
+          <div className="card flex items-center gap-3 p-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 via-green-500 to-blue-500 text-sm font-bold text-white">
+              {viewer.fullName
+                ? viewer.fullName
+                    .slice(0, 1)
+                    .toUpperCase()
+                : "U"}
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-navy">
+                {viewer.fullName}
+              </p>
+
+              <p className="truncate text-xs text-navy/50">
+                {viewer.email}
+              </p>
+            </div>
+
+            <form
+              action="/auth/signout"
+              method="post"
+            >
+              <button
+                type="submit"
+                aria-label="Sign out"
+                className="rounded-lg p-2 text-navy/50 transition-colors hover:bg-steel/60 hover:text-red-500"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
-      {/* Mobile top bar */}
-      <header className="md:hidden fixed top-0 inset-x-0 z-30 bg-surface/95 backdrop-blur-md border-b border-steel px-4 py-2.5 flex items-center justify-between">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <ChakraMark className="w-8 h-8 shrink-0" />
-          <div className="min-w-0">
-            <div className="font-semibold text-xs text-ink truncate leading-tight">
-              {viewer.fullName}
-            </div>
-            <div className="mt-0.5">{renderBadge()}</div>
+      {/* =====================================================
+          MOBILE TOP BAR
+      ===================================================== */}
+
+      <div className="fixed left-0 right-0 top-0 z-40 flex h-16 items-center justify-between border-b border-steel bg-paper/95 px-4 backdrop-blur md:hidden">
+        <div className="flex items-center gap-3">
+          <div className="gradient-tricolour flex h-9 w-9 items-center justify-center rounded-lg text-white">
+            <span className="font-display font-bold">
+              N
+            </span>
           </div>
+
+          <span className="font-display font-bold text-navy">
+            NSS
+          </span>
         </div>
 
-        <div className="flex items-center gap-1">
-          <ThemeToggle />
-          <form action="/auth/signout" method="POST">
-            <button
-              type="submit"
-              title="Sign out"
-              className="p-2 text-ink/40 hover:text-wheelred rounded-lg hover:bg-wheelred/5 transition-colors"
-            >
-              <LogOut size={16} />
-            </button>
-          </form>
-        </div>
-      </header>
+        <button
+          type="button"
+          onClick={() => setMobileOpen(true)}
+          className="rounded-lg p-2 text-navy/60 hover:bg-steel/60"
+          aria-label="Open menu"
+        >
+          <Menu className="h-6 w-6" />
+        </button>
+      </div>
 
-      {/* Desktop sidebar */}
-      <aside className="hidden md:flex md:flex-col w-64 shrink-0 bg-surface border-r border-steel min-h-screen p-4 sticky top-0 h-screen overflow-y-auto">
-        <div className="chakra-motif flex items-center justify-between px-2 py-3 mb-3">
-          <div className="relative z-10 flex items-center gap-3">
-            <ChakraMark className="w-9 h-9" />
-            <div>
-              <div className="font-bold text-sm tracking-tight text-ink">NSS Connect</div>
-              <div className="text-[11px] text-ink/45">Unit Portal</div>
-            </div>
-          </div>
-          <ThemeToggle className="relative z-10" />
-        </div>
+      {/* =====================================================
+          MOBILE DRAWER
+      ===================================================== */}
 
-        {/* User profile card */}
-        <div className="bg-surface2 border border-steel rounded-xl p-3 mb-4">
-          <div className="text-xs font-semibold text-ink truncate">{viewer.fullName}</div>
-          <div className="text-[11px] text-ink/45 truncate mb-2">
-            {viewer.department ? `${viewer.department}` : viewer.email}
-          </div>
-          <div>{renderBadge()}</div>
-        </div>
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div
+            className="absolute inset-0 bg-navy/40"
+            onClick={() => setMobileOpen(false)}
+          />
 
-        {/* Nav Links */}
-        <nav className="space-y-1 flex-1">
-          {links.map((l) => {
-            const Icon = l.icon;
-            const active = pathname === l.href || (l.href !== "/" && pathname?.startsWith(l.href));
-            return (
-              <Link
-                key={l.href}
-                href={l.href}
-                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${
-                  active
-                    ? "bg-saffron text-white font-semibold"
-                    : "text-ink/70 hover:bg-steel/50 hover:text-ink"
-                }`}
+          <div className="absolute right-0 top-0 h-full w-[280px] border-l border-steel bg-white shadow-2xl">
+            <div className="flex h-16 items-center justify-between border-b border-steel px-4">
+              <span className="font-display font-bold text-navy">
+                Menu
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setMobileOpen(false)}
+                className="rounded-lg p-2 text-navy/60 hover:bg-steel/60"
+                aria-label="Close menu"
               >
-                <Icon size={16} className={active ? "text-white" : "text-ink/40"} />
-                {l.label}
-              </Link>
-            );
-          })}
-        </nav>
+                <X className="h-5 w-5" />
+              </button>
+            </div>
 
-        {/* Role contextual note */}
-        <div className="pt-3 mt-auto border-t border-steel">
-          {isOfficial ? (
-            <p className="text-[11px] text-ink/45 px-2 leading-relaxed">
-              Official account with unit-wide administrative & event controls.
-            </p>
-          ) : isCore ? (
-            <p className="text-[11px] text-ink bg-saffron/10 border border-saffron/30 rounded-lg p-2 leading-relaxed">
-              Core Team Head — elevated view access for event attendees and attendance logs.
-            </p>
-          ) : (
-            <p className="text-[11px] text-ink/45 px-2 leading-relaxed">
-              Volunteer tenure: 2 years. Active participation counts toward verified certificates.
-            </p>
-          )}
-
-          <form action="/auth/signout" method="POST" className="mt-3">
-            <button
-              type="submit"
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-ink/45 hover:text-wheelred hover:bg-wheelred/5 rounded-lg transition-colors"
-            >
-              <LogOut size={14} />
-              Sign out
-            </button>
-          </form>
+            <div className="h-[calc(100%-64px)]">
+              <NavContent />
+            </div>
+          </div>
         </div>
+      )}
+
+      {/* =====================================================
+          DESKTOP SIDEBAR
+      ===================================================== */}
+
+      <aside className="fixed left-0 top-0 z-30 hidden h-screen w-72 border-r border-steel bg-white md:block">
+        <NavContent />
       </aside>
 
-      {/* Mobile bottom tab bar */}
-      <nav
-        className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-surface/95 backdrop-blur-md border-t border-steel flex"
-        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
-      >
-        {links.map((l) => {
-          const Icon = l.icon;
-          const active = pathname === l.href || (l.href !== "/" && pathname?.startsWith(l.href));
-          return (
-            <Link
-              key={l.href}
-              href={l.href}
-              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-medium transition-colors ${
-                active ? "text-saffron font-semibold" : "text-ink/45 hover:text-ink"
-              }`}
-            >
-              <div className={`p-1 rounded-lg ${active ? "bg-saffron/10 text-saffron" : "text-ink/35"}`}>
-                <Icon size={18} strokeWidth={active ? 2.5 : 2} />
-              </div>
-              <span className="truncate max-w-[64px] text-center">{l.label.split(" ")[0]}</span>
-            </Link>
-          );
-        })}
-      </nav>
+      {/* =====================================================
+          RESERVE SIDEBAR SPACE
+      ===================================================== */}
+
+      <div
+        className="hidden w-72 shrink-0 md:block"
+        aria-hidden="true"
+      />
     </>
   );
 }

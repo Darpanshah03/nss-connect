@@ -43,82 +43,95 @@ export default function SetPasswordPage() {
     }, 1200);
   }
 
+  const strength = Math.min(3, Math.floor(password.length / 4));
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F1F3F6] px-4 py-8">
-      <div className="w-full max-w-sm bg-white border border-slate-200/90 rounded-3xl p-7 sm:p-8 shadow-md">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-brandred to-orange-600 flex items-center justify-center text-white font-extrabold text-lg shadow-xs">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-surface px-4 py-10">
+      <div className="pointer-events-none absolute -top-40 left-1/2 h-96 w-[40rem] -translate-x-1/2 rounded-full bg-brandblue/10 blur-3xl" />
+
+      <div className="card relative w-full max-w-md p-7 sm:p-9">
+        <div className="mb-7 flex items-center gap-3">
+          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-brandred to-orange-600 font-display text-lg font-bold text-white">
             N
           </div>
           <div>
-            <div className="font-extrabold text-base tracking-tight text-slate-900 leading-tight">
+            <div className="font-display text-base font-bold leading-tight tracking-tight">
               NSS Connect
             </div>
-            <div className="text-xs text-slateink">Welcome — set your password</div>
+            <div className="text-xs text-muted">Welcome — set your password</div>
           </div>
         </div>
 
         {done ? (
-          <div className="text-center py-4 space-y-3">
-            <div className="w-12 h-12 rounded-full bg-emerald-50 text-brandgreen flex items-center justify-center mx-auto">
-              <CheckCircle2 size={24} />
+          <div className="space-y-3 py-8 text-center">
+            <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-emerald-50 text-brandgreen">
+              <CheckCircle2 size={26} />
             </div>
-            <p className="text-sm font-semibold text-slate-900">Password set — taking you in...</p>
+            <p className="font-display text-base font-bold">Password set</p>
+            <p className="text-sm text-muted">Taking you to your dashboard…</p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <p className="text-xs text-slate-500 leading-relaxed">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <p className="rounded-2xl bg-surface px-4 py-3 text-xs leading-relaxed text-muted">
               This is a one-time step. Choose a password you'll use to log in from now on.
             </p>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">New password</label>
+              <label className="label">New password</label>
               <div className="relative">
-                <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
                 <input
                   type="password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="At least 8 characters"
-                  className="w-full border border-slate-200 rounded-xl pl-9 pr-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-brandblue transition-colors"
+                  className="input pl-10"
                 />
+              </div>
+              <div className="mt-2 flex gap-1.5">
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    className={`h-1 flex-1 rounded-full transition-colors ${
+                      i < strength
+                        ? strength === 3
+                          ? "bg-emerald-500"
+                          : "bg-amber-500"
+                        : "bg-border"
+                    }`}
+                  />
+                ))}
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Confirm password</label>
+              <label className="label">Confirm password</label>
               <div className="relative">
-                <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
                 <input
                   type="password"
                   required
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
                   placeholder="Re-type your password"
-                  className="w-full border border-slate-200 rounded-xl pl-9 pr-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-brandblue transition-colors"
+                  className="input pl-10"
                 />
               </div>
             </div>
 
-            {error && (
-              <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl p-3">{error}</div>
-            )}
+            {error && <div className="alert-error">{error}</div>}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-brandblue hover:bg-brandblueDark text-white rounded-xl py-3 text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-60"
-            >
+            <button type="submit" disabled={loading} className="btn-primary w-full py-3">
               {loading ? (
                 <>
-                  <Loader2 size={14} className="animate-spin" />
-                  Saving...
+                  <Loader2 size={15} className="animate-spin" />
+                  Saving…
                 </>
               ) : (
                 <>
-                  Set password & continue
-                  <ArrowRight size={14} />
+                  Set password &amp; continue
+                  <ArrowRight size={15} />
                 </>
               )}
             </button>

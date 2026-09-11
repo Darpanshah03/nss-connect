@@ -1,239 +1,314 @@
-import { redirect } from "next/navigation";
-import { getViewer } from "@/lib/getViewer";
 import { createClient } from "@/lib/supabase/server";
-import Nav from "@/components/Nav";
 import Link from "next/link";
+import ExportButton from "@/components/ExportButton";
 import {
+  ArrowLeft,
   CalendarDays,
   MapPin,
-  Clock,
+  UserCheck,
   Users,
-  ArrowLeft,
-  ShieldCheck,
-  Sparkles,
-  Phone,
-  Hash,
-  CheckCircle2,
 } from "lucide-react";
+import { redirect } from "next/navigation";
+import { getViewer } from "@/lib/getViewer";
+import Nav from "@/components/Nav";
 
-export default async function EventAttendeesPage({
+export default async function AttendeesPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
   const viewer = await getViewer();
+
   if (!viewer) redirect("/login");
 
-  // Core heads and official have access
-  const canView = viewer.role === "core" || viewer.role === "official";
-  if (!canView) redirect("/events");
+  const { id } = await params;
 
   const supabase = createClient();
 
-  const [{ data: event }, { data: registrations }, { data: attendanceList }] =
-    await Promise.all([
-      supabase.from("events").select("*").eq("id", params.id).single(),
-      supabase
-        .from("registrations")
-        .select(
-          "registered_at, user_id, profiles(id, full_name, department, year, tenure_year, status, phone, roll_number)"
-        )
-        .eq("event_id", params.id)
-        .order("registered_at", { ascending: true }),
-      supabase
-        .from("attendance")
-        .select("user_id, present, hours_awarded")
-        .eq("event_id", params.id),
-    ]);
+  const [
+    { data: event },
+    { data: registrations },
+    { data: attendance },
+  ] = await Promise.all([
+    supabase
+      .from("events")
+      .select("*")
+      .eq("id", id)
+      .single(),
 
-  if (!event) redirect(viewer.role === "official" ? "/official/events" : "/events");
+    // Correct table: registrations
+    supabase
+      .from("registrations")
+      .select(
+        "id, user_id, registered_at, profiles(id, full_name, roll_number, department, year)"
+      )
+      .eq("event_id", id),
 
-  const attendanceMap = new Map<string, { present: boolean; hours: number }>();
-  (attendanceList ?? []).forEach((a) =>
-    attendanceMap.set(a.user_id, { present: a.present, hours: a.hours_awarded })
+    // Attendance is stored separately
+    supabase
+      .from("attendance")
+      .select("user_id, present, hours_awarded")
+      .eq("event_id", id),
+  ]);
+
+  if (!event) {
+    redirect("/events");
+  }
+
+  const attendanceByUser = new Map(
+    (attendance ?? []).map((record) => [
+      record.user_id,
+      record,
+    ])
   );
 
-  const registeredList = registrations ?? [];
+  /*
+   * Build the final attendee rows by combining:
+   *
+   * registrations → who registered
+   * attendance    → whether they were marked present
+   */
+  const rows = (registrations ?? []).map((registration) => {
+    const attendanceRecord = attendanceByUser.get(
+      registration.user_id
+    );
+
+    return {
+      id: registration.id,
+      user_id: registration.user_id,
+      registered_at: registration.registered_at,
+      profile: Array.isArray(registration.profiles)
+        ? registration.profiles[0]
+        : registration.profiles,
+      present: attendanceRecord?.present ?? false,
+      hours_awarded: attendanceRecord?.hours_awarded ?? 0,
+    };
+  });
+
+  const presentCount = rows.filter(
+    (row) => row.present
+  ).length;
+
+  const exportRows = rows.map((row) => ({
+    Name: row.profile?.full_name ?? "Unknown",
+    "Roll Number": row.profile?.roll_number ?? "",
+    Department: row.profile?.department ?? "",
+    Year: row.profile?.year ?? "",
+    Attendance: row.present ? "Present" : "Pending",
+    "Hours Awarded": row.hours_awarded,
+  }));
+
+  const exportFilename = `attendees-${event.title}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-");
 
   return (
-    <div className="md:flex min-h-screen bg-[#F8FAFC]">
+    <div className="min-h-screen bg-surface md:flex">
       <Nav viewer={viewer} />
-      <main className="flex-1 w-full px-4 pt-16 pb-24 md:px-8 md:py-8 md:pb-8 max-w-4xl">
-        {/* Back Link */}
+
+      <main className="w-full flex-1 px-4 pb-24 pt-16 md:ml-72 md:px-8 md:py-10 md:pb-10">
+        {/* Back */}
         <Link
-          href={viewer.role === "official" ? "/official/events" : "/events"}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-brandblue mb-4 transition-colors"
+          href={
+            viewer.role === "official"
+              ? "/official/events"
+              : "/events"
+          }
+          className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition hover:text-foreground"
         >
-          <ArrowLeft size={14} />
-          Back to Events
+          <ArrowLeft className="h-4 w-4" />
+          Back to events
         </Link>
 
-        {/* Event Header Banner */}
-        <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-xs mb-6">
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider bg-blue-50 text-brandblue px-2.5 py-0.5 rounded-lg border border-blue-100">
-              {event.category || "General Event"}
-            </span>
-            <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-100">
-              +{event.hours_value} Hours Credit
-            </span>
-            <span
-              className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-lg border ${
-                event.status === "upcoming"
-                  ? "bg-green-50 text-green-700 border-green-200"
-                  : event.status === "past"
-                  ? "bg-slate-100 text-slate-700 border-slate-200"
-                  : "bg-red-50 text-red-700 border-red-200"
-              }`}
-            >
-              {event.status === "upcoming"
-                ? "Upcoming"
-                : event.status === "past"
-                ? "Completed"
-                : "Cancelled"}
-            </span>
-          </div>
+        {/* Event header */}
+        <header className="card mb-8 overflow-hidden p-0">
+          <div className="h-1.5 w-full bg-gradient-to-r from-brandsaffron via-brandwhite to-brandgreen" />
 
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">{event.title}</h1>
-
-          {event.description && (
-            <p className="text-xs sm:text-sm text-slate-600 mb-4 leading-relaxed">
-              {event.description}
-            </p>
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-slate-700 bg-slate-50 border border-slate-100 rounded-2xl p-3 sm:p-4">
-            <div className="flex items-center gap-2">
-              <CalendarDays size={15} className="text-brandblue shrink-0" />
-              <span>
-                {new Date(event.event_date).toLocaleDateString("en-IN", {
-                  weekday: "short",
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                })}
-                {event.event_time ? ` (${event.event_time})` : ""}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <MapPin size={15} className="text-brandred shrink-0" />
-              <span className="truncate">{event.location}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Users size={15} className="text-purple-600 shrink-0" />
-              <span>
-                <strong>{registeredList.length}</strong> / {event.capacity} registered
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Registered Volunteers Section */}
-        <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xs">
-          <div className="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="font-bold text-sm sm:text-base text-slate-900 flex items-center gap-2">
-                <Users size={16} className="text-brandblue" />
-                Registered Volunteers Roster
-              </h2>
-              <p className="text-xs text-slateink mt-0.5">
-                First-Come, First-Served registrations order
+          <div className="flex flex-wrap items-end justify-between gap-6 p-6">
+            <div className="min-w-0">
+              <p className="chip-muted mb-3">
+                Attendance roster
               </p>
+
+              <h1 className="page-title break-words">
+                {event.title}
+              </h1>
+
+              <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
+                {event.event_date && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <CalendarDays className="h-4 w-4 shrink-0" />
+
+                    {new Date(
+                      event.event_date
+                    ).toLocaleDateString("en-IN", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+
+                    {event.event_time
+                      ? ` (${event.event_time})`
+                      : ""}
+                  </span>
+                )}
+
+                {event.location && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <MapPin className="h-4 w-4 shrink-0" />
+                    {event.location}
+                  </span>
+                )}
+
+                <span className="inline-flex items-center gap-1.5">
+                  <Users className="h-4 w-4 shrink-0" />
+                  {rows.length} Registered
+                </span>
+              </div>
             </div>
 
-            {viewer.role === "official" && event.status === "upcoming" && (
-              <Link
-                href={`/official/attendance/${event.id}`}
-                className="text-xs font-bold bg-brandblue text-white px-3.5 py-2 rounded-xl shadow-xs hover:bg-brandblueDark transition-colors"
-              >
-                Mark Attendance
-              </Link>
-            )}
+            {/* Summary + export */}
+            <div className="flex flex-wrap items-center gap-5">
+              <div className="text-right">
+                <div className="font-display text-3xl font-bold leading-none text-foreground">
+                  {presentCount}
+                  <span className="text-lg text-muted-foreground">
+                    /{rows.length}
+                  </span>
+                </div>
+
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Marked present
+                </div>
+              </div>
+
+              <ExportButton
+                filename={`${exportFilename}.csv`}
+                rows={exportRows}
+                label="Export Attendance"
+              />
+            </div>
           </div>
+        </header>
 
-          {registeredList.length === 0 ? (
-            <div className="p-8 text-center text-xs sm:text-sm text-slateink">
-              No volunteers have registered for this event yet.
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {registeredList.map((reg: any, idx: number) => {
-                const profile = reg.profiles;
-                const att = attendanceMap.get(reg.user_id);
+        {/* Empty state */}
+        {rows.length === 0 ? (
+          <div className="card flex flex-col items-center gap-2 px-6 py-16 text-center">
+            <UserCheck className="h-8 w-8 text-muted-foreground" />
 
-                return (
-                  <div
-                    key={reg.user_id}
-                    className="p-4 sm:px-5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/70 transition-colors"
-                  >
-                    <div className="flex items-start gap-3 min-w-0">
-                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-100 text-slate-600 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
-                        {idx + 1}
-                      </div>
+            <p className="font-medium text-foreground">
+              No registrations yet
+            </p>
 
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-xs sm:text-sm text-slate-900">
-                            {profile?.full_name ?? "Volunteer"}
+            <p className="max-w-md text-sm leading-6 text-muted-foreground">
+              Volunteers who register for this event will appear
+              here.
+            </p>
+          </div>
+        ) : (
+          <div className="table-shell overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead>
+                <tr className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <th className="px-4 py-3 font-medium">
+                    #
+                  </th>
+
+                  <th className="px-4 py-3 font-medium">
+                    Volunteer
+                  </th>
+
+                  <th className="px-4 py-3 font-medium">
+                    Roll Number
+                  </th>
+
+                  <th className="px-4 py-3 font-medium">
+                    Department
+                  </th>
+
+                  <th className="px-4 py-3 font-medium">
+                    Year
+                  </th>
+
+                  <th className="px-4 py-3 text-right font-medium">
+                    Attendance
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {rows.map((row, index) => {
+                  const name =
+                    row.profile?.full_name ??
+                    "Unknown Volunteer";
+
+                  const initials = name
+                    .split(" ")
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((part: string) => part[0])
+                    .join("")
+                    .toUpperCase();
+
+                  return (
+                    <tr
+                      key={row.id}
+                      className="border-b last:border-0 hover:bg-muted/30"
+                    >
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {index + 1}
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-muted font-display text-xs font-bold text-foreground">
+                            {initials || "?"}
                           </span>
-                          <span className="text-[10px] font-medium bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md">
-                            Tenure Year {profile?.tenure_year ?? 1}
+
+                          <div className="min-w-0">
+                            <div className="font-medium text-foreground">
+                              {name}
+                            </div>
+
+                            <div className="mt-0.5 text-xs text-muted-foreground">
+                              Registered volunteer
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {row.profile?.roll_number ?? "—"}
+                      </td>
+
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {row.profile?.department ?? "—"}
+                      </td>
+
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {row.profile?.year
+                          ? `Year ${row.profile.year}`
+                          : "—"}
+                      </td>
+
+                      <td className="px-4 py-3 text-right">
+                        {row.present ? (
+                          <span className="chip-success">
+                            Present
                           </span>
-                          {profile?.year && (
-                            <span className="text-[10px] text-slateink">
-                              Acad Year {profile.year}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
-                          {profile?.department && <span>Dept: {profile.department}</span>}
-                          {profile?.roll_number && (
-                            <span className="flex items-center gap-0.5">
-                              <Hash size={11} />
-                              {profile.roll_number}
-                            </span>
-                          )}
-                          {profile?.phone && (
-                            <span className="flex items-center gap-0.5">
-                              <Phone size={11} />
-                              {profile.phone}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="shrink-0 flex sm:flex-col items-center sm:items-end justify-between border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
-                      <div className="text-[11px] text-slateink">
-                        Reg:{" "}
-                        {new Date(reg.registered_at).toLocaleDateString("en-IN", {
-                          day: "numeric",
-                          month: "short",
-                        })}
-                      </div>
-
-                      {att && (
-                        <div className="mt-1">
-                          {att.present ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
-                              <CheckCircle2 size={11} />
-                              Present (+{att.hours}h)
-                            </span>
-                          ) : (
-                            <span className="text-[11px] font-medium text-red-600 bg-red-50 border border-red-100 px-2 py-0.5 rounded-md">
-                              Absent
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                        ) : (
+                          <span className="chip-muted">
+                            Pending
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </main>
     </div>
   );

@@ -1,36 +1,110 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
-  darkMode: "class",
-  content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
+  darkMode: ["class"],
+
+  content: [
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+
   theme: {
     extend: {
-      colors: {
-        // Theme-aware tokens — resolve differently in light vs dark via CSS vars
-        paper: "rgb(var(--paper) / <alpha-value>)",     // page background
-        surface: "rgb(var(--surface) / <alpha-value>)", // card background
-        surface2: "rgb(var(--surface-2) / <alpha-value>)",
-        steel: "rgb(var(--steel) / <alpha-value>)",      // borders
-        ink: "rgb(var(--ink) / <alpha-value>)",          // text (use ink/70, ink/50 etc for muted)
-        saffron: "rgb(var(--saffron) / <alpha-value>)",
-        green: "rgb(var(--green) / <alpha-value>)",
-        wheelred: "rgb(var(--wheelred) / <alpha-value>)",
-
-        // Fixed, non-theme-reactive — used sparingly (e.g. brand mark)
-        navy: "#0A1A3F",
-
-        // Legacy aliases, now theme-aware automatically
-        slateink: "rgb(var(--ink) / <alpha-value>)",
-        brandblue: "rgb(var(--saffron) / <alpha-value>)",
-        brandblueDark: "#CC5E00",
-        brandred: "rgb(var(--wheelred) / <alpha-value>)",
-        brandgreen: "rgb(var(--green) / <alpha-value>)",
-      },
       fontFamily: {
-        sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        sans: ["Inter", "system-ui", "sans-serif"],
+        display: ["Space Grotesk", "Inter", "system-ui", "sans-serif"],
+      },
+
+      colors: {
+  border: "hsl(var(--border))",
+  input: "hsl(var(--input))",
+  ring: "hsl(var(--ring))",
+
+  background: "hsl(var(--background))",
+  foreground: "hsl(var(--foreground))",
+
+  primary: {
+    DEFAULT: "hsl(var(--primary))",
+    foreground: "hsl(var(--primary-foreground))",
+  },
+
+  secondary: {
+    DEFAULT: "hsl(var(--secondary))",
+    foreground: "hsl(var(--secondary-foreground))",
+  },
+
+  destructive: {
+    DEFAULT: "hsl(var(--destructive))",
+    foreground: "hsl(var(--destructive-foreground))",
+  },
+
+  muted: {
+    DEFAULT: "hsl(var(--muted))",
+    foreground: "hsl(var(--muted-foreground))",
+  },
+
+  accent: {
+    DEFAULT: "hsl(var(--accent))",
+    foreground: "hsl(var(--accent-foreground))",
+  },
+
+  card: {
+    DEFAULT: "hsl(var(--card))",
+    foreground: "hsl(var(--card-foreground))",
+  },
+
+  popover: {
+    DEFAULT: "hsl(var(--popover))",
+    foreground: "hsl(var(--popover-foreground))",
+  },
+
+  navy: "hsl(var(--navy))",
+  saffron: "hsl(var(--saffron))",
+  steel: "hsl(var(--steel))",
+  paper: "hsl(var(--paper))",
+  wheelred: "hsl(var(--wheelred))",
+
+  brandblue: "hsl(var(--brandblue))",
+  brandblueDark: "hsl(var(--brandblueDark))",
+  slateink: "hsl(var(--slateink))",
+
+  brandgreen: "hsl(var(--brandgreen))",
+  brandorange: "hsl(var(--brandorange))",
+
+  tricolour: {
+    orange: "hsl(var(--tricolour-orange))",
+    green: "hsl(var(--tricolour-green))",
+    blue: "hsl(var(--tricolour-blue))",
+  },
+},
+
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      },
+
+      keyframes: {
+        "fade-in": {
+          "0%": {
+            opacity: "0",
+            transform: "translateY(8px)",
+          },
+          "100%": {
+            opacity: "1",
+            transform: "translateY(0)",
+          },
+        },
+      },
+
+      animation: {
+        "fade-in": "fade-in 0.3s ease-out",
       },
     },
   },
-  plugins: [],
+
+  plugins: [require("tailwindcss-animate")],
 };
+
 export default config;
