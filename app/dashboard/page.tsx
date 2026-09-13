@@ -3,7 +3,7 @@ import { getViewer } from "@/lib/getViewer";
 import { createClient } from "@/lib/supabase/server";
 import Nav from "@/components/Nav";
 import Link from "next/link";
-import { checkYearEligibility } from "@/lib/hoursEligibility";
+import { checkYearEligibility, getCappedTotalHours } from "@/lib/hoursEligibility";
 import {
   Clock,
   CalendarCheck2,
@@ -25,12 +25,10 @@ export default async function DashboardPage() {
   const supabase = createClient();
 
   const [
-    { data: hoursTotal },
     { data: myRegistrations },
     { data: myAttendance },
     { data: campAttended },
   ] = await Promise.all([
-    supabase.rpc("total_hours", { uid: viewer.id }),
     supabase
       .from("registrations")
       .select(
@@ -54,6 +52,12 @@ export default async function DashboardPage() {
   ]);
 
   const isYear2 = viewer.tenureYear === 2;
+
+  // Capped total (each category maxes out at its own requirement before
+  // being summed) — replaces the old flat total_hours() RPC, which let
+  // excess hours in one category count toward the total even past that
+  // category's own cap.
+  const totalVerifiedHours = await getCappedTotalHours(supabase, viewer.id, isYear2 ? 2 : 1);
 
   const eligibility = await checkYearEligibility(
     supabase,
@@ -81,7 +85,6 @@ export default async function DashboardPage() {
     );
 
   const completedEvents = myAttendance ?? [];
-  const totalVerifiedHours = Number(hoursTotal ?? 0);
 
   const YEAR1_TARGET = 120;
   const TOTAL_TARGET = 240;

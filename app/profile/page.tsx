@@ -3,7 +3,7 @@ import { getViewer } from "@/lib/getViewer";
 import { createClient } from "@/lib/supabase/server";
 import Nav from "@/components/Nav";
 import { updateProfile } from "./actions";
-import { checkYearEligibility } from "@/lib/hoursEligibility";
+import { checkYearEligibility, getCappedTotalHours } from "@/lib/hoursEligibility";
 import {
   User,
   Sparkles,
@@ -26,7 +26,14 @@ export default async function ProfilePage() {
   if (!viewer) redirect("/login");
 
   const supabase = createClient();
-  const { data: hoursTotal } = await supabase.rpc("total_hours", { uid: viewer.id });
+
+  // Capped total (each category maxes out at its own requirement before
+  // being summed) — same fix as /dashboard, so the two pages always agree.
+  const hoursTotal = await getCappedTotalHours(
+    supabase,
+    viewer.id,
+    (viewer.tenureYear === 2 ? 2 : 1) as 1 | 2
+  );
 
   const eligibility = await checkYearEligibility(
     supabase,
@@ -91,7 +98,7 @@ export default async function ProfilePage() {
             <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3">
               <div className="text-[10px] uppercase font-bold text-slate-500">Verified Hours</div>
               <div className="text-xl font-bold font-mono text-brandblue mt-0.5">
-                {Number(hoursTotal ?? 0)} <span className="text-xs font-normal">hrs</span>
+                {hoursTotal} <span className="text-xs font-normal">hrs</span>
               </div>
             </div>
             <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3">
