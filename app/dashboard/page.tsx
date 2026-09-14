@@ -100,9 +100,9 @@ export default async function DashboardPage() {
   return (
     <div className="min-h-screen bg-surface md:flex">
       <Nav viewer={viewer} />
-      <NotificationOptIn />
 
       <main className="min-w-0 flex-1 px-4 pb-24 pt-16 md:px-10 md:py-10 md:pb-10">
+        <NotificationOptIn />
         {/* Hero header */}
         <section className="relative mb-8 overflow-hidden rounded-3xl border border-border bg-card p-6 text-navy shadow-sm sm:p-8">
           <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-brandblue/10 blur-3xl" />
