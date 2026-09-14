@@ -1,7 +1,8 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath } from "next/cache"; 
+import { broadcastNewEventNotification } from "@/lib/pushNotifications";
 
 export async function postEvent(formData: FormData) {
   const supabase = createClient();
@@ -45,6 +46,14 @@ export async function postEvent(formData: FormData) {
   });
 
   if (error) throw new Error(error.message);
+  
+  // Never let a push failure block event creation.
+  try {
+    await broadcastNewEventNotification(title, user.id);
+  } catch (err) {
+    console.error("Push notification broadcast failed:", err);
+  }
+
   revalidatePath("/official/events");
   revalidatePath("/events");
   revalidatePath("/dashboard");

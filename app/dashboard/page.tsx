@@ -3,6 +3,7 @@ import { getViewer } from "@/lib/getViewer";
 import { createClient } from "@/lib/supabase/server";
 import Nav from "@/components/Nav";
 import Link from "next/link";
+import NotificationOptIn from "@/components/NotificationOptIn";
 import { checkYearEligibility, getCappedTotalHours } from "@/lib/hoursEligibility";
 import {
   Clock,
@@ -99,6 +100,7 @@ export default async function DashboardPage() {
   return (
     <div className="min-h-screen bg-surface md:flex">
       <Nav viewer={viewer} />
+      <NotificationOptIn />
 
       <main className="min-w-0 flex-1 px-4 pb-24 pt-16 md:px-10 md:py-10 md:pb-10">
         {/* Hero header */}
