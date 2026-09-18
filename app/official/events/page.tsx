@@ -25,7 +25,11 @@ import {
   GraduationCap,
 } from "lucide-react";
 
-export default async function OfficialEventsPage() {
+export default async function OfficialEventsPage({
+  searchParams,
+}: {
+  searchParams?: { category?: string };
+}) {
   const viewer = await getViewer();
 
   if (!viewer) redirect("/login");
@@ -50,9 +54,18 @@ export default async function OfficialEventsPage() {
     (event) => event.status !== "upcoming"
   );
 
+  // Stats stay based on the FULL list, unfiltered — the category pills
+  // below only narrow what's shown in the two event lists further down.
   const totalRegistrations = upcomingEvents.reduce((total, event) => {
     return total + (event.registrations?.[0]?.count ?? 0);
   }, 0);
+
+  const selectedCategory = searchParams?.category;
+  const matchesCategory = (event: any) =>
+    !selectedCategory || selectedCategory === "all" || event.category === selectedCategory;
+
+  const filteredUpcomingEvents = upcomingEvents.filter(matchesCategory);
+  const filteredPastEvents = pastEvents.filter(matchesCategory);
 
   const { data: allAttendance } = await supabase
     .from("attendance")
@@ -518,7 +531,7 @@ export default async function OfficialEventsPage() {
                   <Lightbulb className="mx-auto mb-3 h-5 w-5 text-orange-400" />
 
                   <p className="text-sm italic leading-6 text-[#64748b]">
-                    “Together we can create a greater impact.”
+                    "Together we can create a greater impact."
                   </p>
 
                   <p className="mt-2 text-xs font-bold text-[#94a3b8]">
@@ -539,10 +552,35 @@ export default async function OfficialEventsPage() {
           </section>
 
           {/* ========================================================= */}
-          {/* UPCOMING EVENTS */}
+          {/* CATEGORY FILTER PILLS */}
           {/* ========================================================= */}
 
           <section className="mt-10">
+            <div className="mb-4 flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              {["all", ...EVENT_CATEGORIES].map((cat) => {
+                const isSelected = (selectedCategory ?? "all") === cat;
+                return (
+                  <Link
+                    key={cat}
+                    href={cat === "all" ? "/official/events" : `/official/events?category=${encodeURIComponent(cat)}`}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
+                      isSelected
+                        ? "bg-blue-600 text-white"
+                        : "bg-white border border-[#dce4ef] text-[#64748b] hover:bg-slate-50"
+                    }`}
+                  >
+                    {cat === "all" ? "All Categories" : cat}
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* ========================================================= */}
+          {/* UPCOMING EVENTS */}
+          {/* ========================================================= */}
+
+          <section className="mt-4">
 
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
 
@@ -560,20 +598,20 @@ export default async function OfficialEventsPage() {
                 </p>
               </div>
 
-              {upcomingEvents.length > 0 && (
+              {filteredUpcomingEvents.length > 0 && (
                 <span className="text-xs font-semibold text-[#94a3b8]">
-                  {upcomingEvents.length} active event
-                  {upcomingEvents.length !== 1 ? "s" : ""}
+                  {filteredUpcomingEvents.length} active event
+                  {filteredUpcomingEvents.length !== 1 ? "s" : ""}
                 </span>
               )}
 
             </div>
 
-            {upcomingEvents.length > 0 ? (
+            {filteredUpcomingEvents.length > 0 ? (
 
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
 
-                {upcomingEvents.map((event: any) => {
+                {filteredUpcomingEvents.map((event: any) => {
 
                   const regCount =
                     event.registrations?.[0]?.count ?? 0;
@@ -737,7 +775,9 @@ export default async function OfficialEventsPage() {
                 </h3>
 
                 <p className="mt-1 text-xs text-[#94a3b8]">
-                  Create an event above to open registrations.
+                  {selectedCategory && selectedCategory !== "all"
+                    ? "No upcoming events in this category."
+                    : "Create an event above to open registrations."}
                 </p>
 
               </div>
@@ -750,7 +790,7 @@ export default async function OfficialEventsPage() {
           {/* PAST EVENTS */}
           {/* ========================================================= */}
 
-          {pastEvents.length > 0 && (
+          {filteredPastEvents.length > 0 && (
 
             <section className="mt-10">
 
@@ -774,7 +814,7 @@ export default async function OfficialEventsPage() {
 
                 <div className="divide-y divide-[#e5eaf1]">
 
-                  {pastEvents.map((event: any) => {
+                  {filteredPastEvents.map((event: any) => {
 
                     const regCount =
                       event.registrations?.[0]?.count ?? 0;

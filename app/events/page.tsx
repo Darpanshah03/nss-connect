@@ -5,8 +5,13 @@ import { CalendarDays, MapPin, Users, Clock } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/getViewer";
 import Nav from "@/components/Nav";
+import { EVENT_CATEGORIES } from "@/lib/eventCategories";
 
-export default async function EventsPage() {
+export default async function EventsPage({
+  searchParams,
+}: {
+  searchParams?: { category?: string };
+}) {
   const viewer = await getViewer();
   if (!viewer) redirect("/login");
   if (viewer.role === "official") redirect("/official/events");
@@ -25,16 +30,21 @@ export default async function EventsPage() {
   );
 
   const today = new Date().toISOString().slice(0, 10);
+  const selectedCategory = searchParams?.category;
+
+  const matchesCategory = (event: any) =>
+    !selectedCategory || selectedCategory === "all" || event.category === selectedCategory;
 
   const upcoming = (events ?? []).filter(
-    (event) => event.status === "upcoming" && event.event_date >= today
+    (event) => event.status === "upcoming" && event.event_date >= today && matchesCategory(event)
   );
 
   const past = (events ?? []).filter(
     (event) =>
-      event.status === "past" ||
-      event.status === "cancelled" ||
-      event.event_date < today
+      (event.status === "past" ||
+        event.status === "cancelled" ||
+        event.event_date < today) &&
+      matchesCategory(event)
   );
 
   const canViewRoster = viewer.role === "core";
@@ -64,13 +74,37 @@ export default async function EventsPage() {
           </div>
         </header>
 
+        {/* Category Filter Pills — filters both Upcoming and Past sections */}
+        <div className="mb-8 flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          {["all", ...EVENT_CATEGORIES].map((cat) => {
+            const isSelected = (selectedCategory ?? "all") === cat;
+            return (
+              <Link
+                key={cat}
+                href={cat === "all" ? "/events" : `/events?category=${encodeURIComponent(cat)}`}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
+                  isSelected
+                    ? "bg-blue-600 text-white"
+                    : "bg-white border border-border text-muted-foreground hover:bg-muted/40"
+                }`}
+              >
+                {cat === "all" ? "All Categories" : cat}
+              </Link>
+            );
+          })}
+        </div>
+
         <section className="mb-12">
           <h2 className="mb-4 font-display text-lg">Upcoming</h2>
           {upcoming.length === 0 ? (
             <div className="card flex flex-col items-center gap-2 px-6 py-14 text-center">
               <CalendarDays className="h-8 w-8 text-muted-foreground" />
               <p className="font-medium">No upcoming events</p>
-              <p className="text-sm text-muted-foreground">New drives are posted by your programme officer.</p>
+              <p className="text-sm text-muted-foreground">
+                {selectedCategory && selectedCategory !== "all"
+                  ? "No upcoming events in this category."
+                  : "New drives are posted by your programme officer."}
+              </p>
             </div>
           ) : (
             <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
@@ -150,7 +184,9 @@ export default async function EventsPage() {
           <h2 className="mb-4 font-display text-lg">Past Events</h2>
           {past.length === 0 ? (
             <div className="card px-6 py-10 text-center text-sm text-muted-foreground">
-              No past events yet.
+              {selectedCategory && selectedCategory !== "all"
+                ? "No past events in this category."
+                : "No past events yet."}
             </div>
           ) : (
             <div className="table-shell overflow-x-auto">

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import Nav from "@/components/Nav";
 import VolunteerActions from "./VolunteerActions";
 import AddVolunteerModal from "./AddVolunteerModal";
+import HoursFilterSelect from "@/components/HoursFilterSelect";
 import Link from "next/link";
 import {
   Users,
@@ -16,6 +17,7 @@ import {
   Hash,
 } from "lucide-react";
 import ExportButton from "@/components/ExportButton";
+import { getCappedHoursMapForAllUsers } from "@/lib/hoursEligibility";
 
 const POSITIONS = [
   "NSS Leader",
@@ -30,7 +32,7 @@ const POSITIONS = [
 export default async function VolunteersPage({
   searchParams,
 }: {
-  searchParams?: { filter?: string; q?: string };
+  searchParams?: { filter?: string; q?: string; hours?: string };
 }) {
   const viewer = await getViewer();
   if (!viewer) redirect("/login");
@@ -39,6 +41,7 @@ export default async function VolunteersPage({
   const supabase = createClient();
   const filter = searchParams?.filter ?? "active";
   const searchQuery = searchParams?.q?.toLowerCase() ?? "";
+  const hoursFilter = searchParams?.hours ?? "";
 
   const [{ data: profiles }, { data: roles }, { data: hours }] = await Promise.all([
     supabase
@@ -50,15 +53,22 @@ export default async function VolunteersPage({
   ]);
 
   const roleByUser = new Map((roles ?? []).map((r) => [r.user_id, r]));
-  const hoursByUser = new Map<string, number>();
+
+  // Raw hours — unchanged, shown on each volunteer's card exactly as before.
+  const rawHoursByUser = new Map<string, number>();
   (hours ?? []).forEach((h) =>
-    hoursByUser.set(h.user_id, (hoursByUser.get(h.user_id) ?? 0) + Number(h.hours_awarded))
+    rawHoursByUser.set(h.user_id, (rawHoursByUser.get(h.user_id) ?? 0) + Number(h.hours_awarded))
   );
 
   const allVolunteers = (profiles ?? []).filter((p) => {
     const r = roleByUser.get(p.id);
     return r?.role !== "official";
   });
+
+  // Capped hours — used only for the "completed 120/240 hrs" filter, in one
+  // bulk pass rather than a per-volunteer loop.
+  const tenureYearByUser = new Map(allVolunteers.map((v) => [v.id, v.tenure_year ?? 1]));
+  const cappedHoursByUser = await getCappedHoursMapForAllUsers(supabase, tenureYearByUser);
 
   const totalCount = allVolunteers.length;
   const activeCount = allVolunteers.filter((v) => v.status === "active").length;
@@ -79,6 +89,12 @@ export default async function VolunteersPage({
       v.roll_number?.toLowerCase().includes(searchQuery);
 
     if (!matchesSearch) return false;
+
+    if (hoursFilter) {
+      const threshold = Number(hoursFilter);
+      const capped = cappedHoursByUser.get(v.id) ?? 0;
+      if (capped < threshold) return false;
+    }
 
     if (filter === "all") return true;
     if (filter === "active") return v.status === "active";
@@ -115,7 +131,8 @@ export default async function VolunteersPage({
                 "Tenure Year": v.tenure_year ?? 1,
                 Status: v.status,
                 Position: roleByUser.get(v.id)?.position ?? "",
-                "Hours Logged": hoursByUser.get(v.id) ?? 0,
+                "Hours Logged": rawHoursByUser.get(v.id) ?? 0,
+                "Capped Hours": cappedHoursByUser.get(v.id) ?? 0,
                 Phone: v.phone ?? "",
                 "Roll Number": v.roll_number ?? "",
               }))}
@@ -163,10 +180,14 @@ export default async function VolunteersPage({
               { key: "all", label: "All" },
             ].map((t) => {
               const active = filter === t.key;
+              const params = new URLSearchParams();
+              params.set("filter", t.key);
+              if (searchQuery) params.set("q", searchQuery);
+              if (hoursFilter) params.set("hours", hoursFilter);
               return (
                 <Link
                   key={t.key}
-                  href={`/official/volunteers?filter=${t.key}${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ""}`}
+                  href={`/official/volunteers?${params.toString()}`}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
                     active
                       ? "bg-saffron text-white"
@@ -178,13 +199,15 @@ export default async function VolunteersPage({
               );
             })}
           </div>
+
+          <HoursFilterSelect />
         </div>
 
         {/* Volunteers List */}
         <div className="space-y-3">
           {filteredVolunteers.map((p) => {
             const role = roleByUser.get(p.id);
-            const totalHours = hoursByUser.get(p.id) ?? 0;
+            const totalHours = rawHoursByUser.get(p.id) ?? 0;
             const isCore = role?.role === "core";
 
             return (
