@@ -9,10 +9,13 @@ import {
   deleteVolunteerPermanently,
   setProfilePhoto,
   updateVolunteerInfo,
+  getVolunteerEventHistory,
 } from "./actions";
 import { EVENT_CATEGORIES } from "@/lib/eventCategories";
 import type { EligibilityResult } from "@/lib/hoursEligibility";
+import type { EventHistoryEntry } from "@/lib/attendanceHistory";
 import PortraitCropper from "@/components/PortraitCropper";
+import EventHistoryList from "@/components/EventHistoryList";
 import {
   GraduationCap,
   UserX,
@@ -27,6 +30,7 @@ import {
   Camera,
   Pencil,
   X,
+  History,
 } from "lucide-react";
 
 type BlockedAction =
@@ -89,7 +93,6 @@ export default function VolunteerActions({
   const [rawPhotoFile, setRawPhotoFile] = useState<File | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
 
-  // Edit Info — official can change any field, anytime
   const [editOpen, setEditOpen] = useState(false);
   const [editFullName, setEditFullName] = useState(fullName);
   const [editDepartment, setEditDepartment] = useState(department ?? "");
@@ -97,6 +100,12 @@ export default function VolunteerActions({
   const [editRollNumber, setEditRollNumber] = useState(rollNumber ?? "");
   const [editYear, setEditYear] = useState(year ? String(year) : "");
   const [editError, setEditError] = useState<string | null>(null);
+
+  // Event attendance history
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyEntries, setHistoryEntries] = useState<EventHistoryEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   function handlePositionChange(val: string) {
     if (val === "__custom__") {
@@ -293,6 +302,23 @@ export default function VolunteerActions({
     });
   }
 
+  function handleOpenHistory() {
+    setHistoryOpen(true);
+    setHistoryError(null);
+    setHistoryLoading(true);
+
+    startTransition(async () => {
+      try {
+        const entries = await getVolunteerEventHistory(userId);
+        setHistoryEntries(entries);
+      } catch (e: any) {
+        setHistoryError(e.message ?? "Could not load event history.");
+      } finally {
+        setHistoryLoading(false);
+      }
+    });
+  }
+
   const modalOverlay =
     "fixed inset-0 z-[60] flex items-center justify-center bg-navy/60 p-4 backdrop-blur-sm";
 
@@ -398,6 +424,18 @@ export default function VolunteerActions({
           </button>
         )}
 
+        {/* History */}
+        <button
+          type="button"
+          disabled={pending}
+          onClick={handleOpenHistory}
+          title="View event attendance history"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-steel bg-white px-2.5 py-2 text-[11px] font-bold text-navy/60 shadow-sm transition hover:bg-steel/40 hover:text-navy disabled:opacity-50"
+        >
+          <History size={13} />
+          <span className="hidden xl:inline">History</span>
+        </button>
+
         {/* Edit */}
         <button
           type="button"
@@ -436,6 +474,57 @@ export default function VolunteerActions({
           <span className="hidden xl:inline">Delete</span>
         </button>
       </div>
+
+      {/* =====================================================
+          EVENT HISTORY MODAL
+      ===================================================== */}
+      {historyOpen && (
+        <div
+          className={modalOverlay}
+          onMouseDown={() => setHistoryOpen(false)}
+        >
+          <div
+            className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl border border-steel bg-white shadow-2xl"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="h-1.5 bg-gradient-to-r from-brandblue via-white to-brandgreen" />
+            <div className="p-5 sm:p-6">
+              <div className="mb-5 flex items-start justify-between gap-4">
+                <div>
+                  <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-brandblue">
+                    Official Controls
+                  </p>
+                  <h3 className="font-display text-lg font-bold text-navy">
+                    Event Attendance History
+                  </h3>
+                  <p className="mt-1 text-xs leading-relaxed text-navy/50">
+                    {fullName}'s full past-event record.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setHistoryOpen(false)}
+                  className="rounded-xl p-2 text-navy/40 transition hover:bg-steel/50 hover:text-navy"
+                >
+                  <X size={17} />
+                </button>
+              </div>
+
+              {historyLoading ? (
+                <div className="flex items-center justify-center py-12 text-navy/40">
+                  <Loader2 size={22} className="animate-spin" />
+                </div>
+              ) : historyError ? (
+                <div className="rounded-xl border border-wheelred/20 bg-wheelred/5 p-3 text-xs text-wheelred">
+                  {historyError}
+                </div>
+              ) : (
+                <EventHistoryList entries={historyEntries} />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* =====================================================
           EDIT INFO MODAL
@@ -912,7 +1001,6 @@ export default function VolunteerActions({
                 </button>
               </div>
 
-              {/* Eligibility breakdown */}
               <div className="space-y-2">
                 {blocked.eligibility.breakdown.map((b) => (
                   <div
@@ -988,7 +1076,6 @@ export default function VolunteerActions({
                 )}
               </div>
 
-              {/* Adjustment */}
               <div className="mt-5 rounded-2xl border border-steel bg-paper p-4">
                 <div className="mb-3 flex items-center gap-2">
                   <div className="rounded-lg bg-brandblue/10 p-1.5 text-brandblue">

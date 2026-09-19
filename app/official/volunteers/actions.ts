@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { checkYearEligibility, EligibilityResult } from "@/lib/hoursEligibility";
 import { EVENT_CATEGORIES } from "@/lib/eventCategories";
+import { getEventHistoryForUser, EventHistoryEntry } from "@/lib/attendanceHistory";
 
 async function verifyOfficial() {
   const supabase = createClient();
@@ -195,10 +196,6 @@ export async function setProfilePhoto(userId: string, formData: FormData) {
   revalidatePath("/team");
 }
 
-// Official-only, unrestricted editing of a volunteer's info fields — unlike
-// updateProfile (self-service, fill-empty-fields-only), this can change
-// any field at any time, e.g. to correct a typo or fill in something the
-// volunteer already locked in incorrectly.
 export async function updateVolunteerInfo(
   userId: string,
   updates: {
@@ -230,6 +227,14 @@ export async function updateVolunteerInfo(
   revalidatePath("/official/volunteers");
   revalidatePath("/team");
   revalidatePath("/profile");
+}
+
+// For the "History" button in VolunteerActions — fetched on demand only for
+// the specific volunteer whose modal is opened, not eagerly for the whole
+// list of 100 volunteers.
+export async function getVolunteerEventHistory(userId: string): Promise<EventHistoryEntry[]> {
+  const { supabase } = await verifyOfficial();
+  return getEventHistoryForUser(supabase, userId);
 }
 
 export async function createVolunteerAccount(formData: FormData) {

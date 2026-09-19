@@ -5,6 +5,8 @@ import Nav from "@/components/Nav";
 import Link from "next/link";
 import NotificationOptIn from "@/components/NotificationOptIn";
 import { checkYearEligibility, getCappedTotalHours } from "@/lib/hoursEligibility";
+import { getEventHistoryForUser } from "@/lib/attendanceHistory";
+import EventHistoryList from "@/components/EventHistoryList";
 import {
   Clock,
   CalendarCheck2,
@@ -16,6 +18,7 @@ import {
   GraduationCap,
   Award,
   AlertTriangle,
+  History,
 } from "lucide-react";
 
 export default async function DashboardPage() {
@@ -54,10 +57,6 @@ export default async function DashboardPage() {
 
   const isYear2 = viewer.tenureYear === 2;
 
-  // Capped total (each category maxes out at its own requirement before
-  // being summed) — replaces the old flat total_hours() RPC, which let
-  // excess hours in one category count toward the total even past that
-  // category's own cap.
   const totalVerifiedHours = await getCappedTotalHours(supabase, viewer.id, isYear2 ? 2 : 1);
 
   const eligibility = await checkYearEligibility(
@@ -66,6 +65,8 @@ export default async function DashboardPage() {
     (isYear2 ? 2 : 1) as 1 | 2,
     false
   );
+
+  const eventHistory = await getEventHistoryForUser(supabase, viewer.id);
 
       const upcoming = (myRegistrations ?? [])
     .map((registration) => {
@@ -103,6 +104,7 @@ export default async function DashboardPage() {
 
       <main className="min-w-0 flex-1 px-4 pb-24 pt-16 md:px-10 md:py-10 md:pb-10">
         <NotificationOptIn />
+
         {/* Hero header */}
         <section className="relative mb-8 overflow-hidden rounded-3xl border border-border bg-card p-6 text-navy shadow-sm sm:p-8">
           <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-brandblue/10 blur-3xl" />
@@ -394,6 +396,15 @@ export default async function DashboardPage() {
 ))}
             </div>
           )}
+        </section>
+
+        {/* Event Attendance History — Attended / Missed / Pending / Never Registered */}
+        <section className="mb-10">
+          <div className="mb-4 flex items-center gap-2">
+            <History size={16} className="text-brandblue" />
+            <h2 className="section-title">Event Attendance History</h2>
+          </div>
+          <EventHistoryList entries={eventHistory} />
         </section>
 
         {/* Hours ledger */}
