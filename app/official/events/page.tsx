@@ -3,23 +3,18 @@ import Link from "next/link";
 import { getViewer } from "@/lib/getViewer";
 import { createClient } from "@/lib/supabase/server";
 import Nav from "@/components/Nav";
-import { postEvent } from "./actions";
+import PostEventModal from "./PostEventModal";
 import EventActions from "./EventActions";
 import { EVENT_CATEGORIES } from "@/lib/eventCategories";
 import ExportButton from "@/components/ExportButton";
 
 import {
   CalendarDays,
-  Plus,
   Users,
   CheckCircle2,
   MapPin,
   Clock3,
-  UserRound,
-  FileText,
-  Send,
   Lightbulb,
-  CircleCheck,
   ArrowRight,
   ShieldCheck,
   GraduationCap,
@@ -54,8 +49,6 @@ export default async function OfficialEventsPage({
     (event) => event.status !== "upcoming"
   );
 
-  // Stats stay based on the FULL list, unfiltered — the category pills
-  // below only narrow what's shown in the two event lists further down.
   const totalRegistrations = upcomingEvents.reduce((total, event) => {
     return total + (event.registrations?.[0]?.count ?? 0);
   }, 0);
@@ -105,7 +98,7 @@ export default async function OfficialEventsPage({
                 </div>
 
                 <h1 className="text-3xl font-bold tracking-tight text-[#10213f] sm:text-4xl">
-                  Post a New Event
+                  Manage NSS Events
                 </h1>
 
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-[#64748b]">
@@ -199,272 +192,37 @@ export default async function OfficialEventsPage({
           </section>
 
           {/* ========================================================= */}
-          {/* CREATE EVENT + QUICK TIPS */}
+          {/* POST EVENT TRIGGER — now a button + modal */}
           {/* ========================================================= */}
 
-          <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_350px]">
+          <section className="mb-6">
+            <PostEventModal />
+          </section>
 
-            {/* EVENT FORM */}
-            <div className="overflow-hidden rounded-3xl border border-[#dce4ef] bg-white shadow-sm">
+          {/* ========================================================= */}
+          {/* QUICK TIPS — now standalone, full-width */}
+          {/* ========================================================= */}
 
-              {/* Form header */}
-              <div className="border-b border-[#e5eaf1] bg-gradient-to-r from-white to-orange-50/60 px-6 py-5 sm:px-7">
-                <div className="flex items-center gap-3">
-
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-50 text-orange-500">
-                    <Plus className="h-5 w-5" />
-                  </div>
-
-                  <div>
-                    <h2 className="text-lg font-bold text-[#10213f]">
-                      Post a New Event
-                    </h2>
-
-                    <p className="mt-0.5 text-xs text-[#94a3b8]">
-                      Set date, location, verified hours, and capacity
-                    </p>
-                  </div>
-
-                </div>
-              </div>
-
-              <form action={postEvent} className="space-y-5 p-6 sm:p-7">
-
-                {/* Event title */}
-                <div>
-                  <label
-                    htmlFor="event-title"
-                    className="mb-2 block text-xs font-bold text-[#334155]"
-                  >
-                    Event Title <span className="text-red-500">*</span>
-                  </label>
-
-                  <div className="relative">
-
-                    <FileText className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
-                    <input
-                      id="event-title"
-                      name="title"
-                      required
-                      placeholder="e.g. Mega Blood Donation Camp 2026"
-                      className="!h-11 !border !border-[#d8e1ed] !bg-white !pl-10 !text-[#10213f] placeholder:!text-[#94a3b8] focus:!border-blue-500 focus:!ring-2 focus:!ring-blue-500/10"
-                    />
-
-                  </div>
-                </div>
-
-                {/* Category / date / time */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-
-                  <div>
-                    <label
-                      htmlFor="category"
-                      className="mb-2 block text-xs font-bold text-[#334155]"
-                    >
-                      Category <span className="text-red-500">*</span>
-                    </label>
-
-                    <select
-                      id="category"
-                      name="category"
-                      defaultValue={EVENT_CATEGORIES[0]}
-                      className="!h-11 !cursor-pointer !border !border-[#d8e1ed] !bg-white !text-[#10213f] focus:!border-blue-500 focus:!ring-2 focus:!ring-blue-500/10"
-                    >
-                      {EVENT_CATEGORIES.map((category) => (
-                        <option key={category} value={category}>
-                          {category}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="event-date"
-                      className="mb-2 block text-xs font-bold text-[#334155]"
-                    >
-                      Event Date <span className="text-red-500">*</span>
-                    </label>
-
-                    <input
-                      id="event-date"
-                      name="event_date"
-                      type="date"
-                      required
-                      className="!h-11 !border !border-[#d8e1ed] !bg-white !text-[#10213f] focus:!border-blue-500 focus:!ring-2 focus:!ring-blue-500/10"
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="event-time"
-                      className="mb-2 block text-xs font-bold text-[#334155]"
-                    >
-                      Time / Slot
-                    </label>
-
-                    <div className="relative">
-
-                      <Clock3 className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
-                      <input
-                        id="event-time"
-                        name="event_time"
-                        placeholder="09:00 AM - 01:00 PM"
-                        className="!h-11 !border !border-[#d8e1ed] !bg-white !pl-10 !text-[#10213f] placeholder:!text-[#94a3b8] focus:!border-blue-500 focus:!ring-2 focus:!ring-blue-500/10"
-                      />
-
-                    </div>
-                  </div>
-                </div>
-
-                {/* Location / Capacity / Hours */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-
-                  <div>
-                    <label
-                      htmlFor="location"
-                      className="mb-2 block text-xs font-bold text-[#334155]"
-                    >
-                      Location / Venue{" "}
-                      <span className="text-red-500">*</span>
-                    </label>
-
-                    <div className="relative">
-
-                      <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
-                      <input
-                        id="location"
-                        name="location"
-                        required
-                        placeholder="e.g. College Auditorium / Seminar Hall"
-                        className="!h-11 !border !border-[#d8e1ed] !bg-white !pl-10 !text-[#10213f] placeholder:!text-[#94a3b8] focus:!border-blue-500 focus:!ring-2 focus:!ring-blue-500/10"
-                      />
-
-                    </div>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="capacity"
-                      className="mb-2 block text-xs font-bold text-[#334155]"
-                    >
-                      Capacity Limit (FCFS){" "}
-                      <span className="text-red-500">*</span>
-                    </label>
-
-                    <div className="relative">
-
-                      <UserRound className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
-                      <input
-                        id="capacity"
-                        name="capacity"
-                        type="number"
-                        min="1"
-                        defaultValue="30"
-                        required
-                        placeholder="Max spots"
-                        className="!h-11 !border !border-[#d8e1ed] !bg-white !pl-10 !text-[#10213f] placeholder:!text-[#94a3b8] focus:!border-blue-500 focus:!ring-2 focus:!ring-blue-500/10"
-                      />
-
-                    </div>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="hours-value"
-                      className="mb-2 block text-xs font-bold text-[#334155]"
-                    >
-                      Hours Value <span className="text-red-500">*</span>
-                    </label>
-
-                    <div className="relative">
-
-                      <Clock3 className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
-                      <input
-                        id="hours-value"
-                        name="hours_value"
-                        type="number"
-                        step="0.5"
-                        min="0.5"
-                        defaultValue="4"
-                        required
-                        placeholder="Hours awarded"
-                        className="!h-11 !border !border-[#d8e1ed] !bg-white !pl-10 !text-[#10213f] placeholder:!text-[#94a3b8] focus:!border-blue-500 focus:!ring-2 focus:!ring-blue-500/10"
-                      />
-
-                    </div>
-                  </div>
-                </div>
-
-                {/* Description */}
-                <div>
-                  <label
-                    htmlFor="description"
-                    className="mb-2 block text-xs font-bold text-[#334155]"
-                  >
-                    Description / Volunteer Instructions{" "}
-                    <span className="font-normal text-[#94a3b8]">
-                      (Optional)
-                    </span>
-                  </label>
-
-                  <textarea
-                    id="description"
-                    name="description"
-                    rows={4}
-                    placeholder="Details on requirements, dress code (NSS badge/T-shirt), reporting time, etc."
-                    className="!min-h-[105px] !resize-y !border !border-[#d8e1ed] !bg-white !py-3 !text-[#10213f] placeholder:!text-[#94a3b8] focus:!border-blue-500 focus:!ring-2 focus:!ring-blue-500/10"
-                  />
-                </div>
-
-                {/* Submit */}
-                <div className="flex flex-col gap-3 border-t border-[#e5eaf1] pt-5 sm:flex-row sm:items-center sm:justify-between">
-
-                  <p className="text-xs leading-5 text-[#94a3b8]">
-                    Make sure the event information is accurate before posting.
-                  </p>
-
-                  <button
-                    type="submit"
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                  >
-                    <Send className="h-4 w-4" />
-                    Post Event Now
-                  </button>
-
-                </div>
-              </form>
-            </div>
-
-            {/* ========================================================= */}
-            {/* QUICK TIPS */}
-            {/* ========================================================= */}
-
-            <aside className="relative overflow-hidden rounded-3xl border border-blue-100 bg-gradient-to-b from-blue-50 via-white to-white p-6 shadow-sm">
+          <section className="mb-10">
+            <div className="relative overflow-hidden rounded-3xl border border-blue-100 bg-gradient-to-b from-blue-50 via-white to-white p-6 shadow-sm sm:p-8">
 
               <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-blue-300/10 blur-3xl" />
 
               <div className="relative">
 
-                {/* Icon */}
-                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-blue-100">
-                  <Lightbulb className="h-6 w-6 text-orange-500" />
+                <div className="mb-5 flex items-center gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-blue-100">
+                    <Lightbulb className="h-6 w-6 text-orange-500" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-[#10213f]">Quick Tips</h3>
+                    <p className="mt-1 text-xs leading-5 text-[#64748b]">
+                      A few things every NSS volunteer should remember.
+                    </p>
+                  </div>
                 </div>
 
-                <h3 className="text-xl font-bold text-[#10213f]">
-                  Quick Tips
-                </h3>
-
-                <p className="mt-1 text-xs leading-5 text-[#64748b]">
-                  A few things every NSS volunteer should remember.
-                </p>
-
-                <div className="mt-6 space-y-5">
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
 
                   {/* Tip 1 */}
                   <div className="flex items-start gap-3">
@@ -527,17 +285,11 @@ export default async function OfficialEventsPage({
 
                 {/* Quote */}
                 <div className="text-center">
-
                   <Lightbulb className="mx-auto mb-3 h-5 w-5 text-orange-400" />
-
                   <p className="text-sm italic leading-6 text-[#64748b]">
                     "Together we can create a greater impact."
                   </p>
-
-                  <p className="mt-2 text-xs font-bold text-[#94a3b8]">
-                    — NSS
-                  </p>
-
+                  <p className="mt-2 text-xs font-bold text-[#94a3b8]">— NSS</p>
                 </div>
 
               </div>
@@ -548,15 +300,15 @@ export default async function OfficialEventsPage({
                 <div className="absolute bottom-[-7px] left-[-5%] h-6 w-[110%] rotate-[-2deg] rounded-[50%] border-t-4 border-emerald-400" />
               </div>
 
-            </aside>
+            </div>
           </section>
 
           {/* ========================================================= */}
           {/* CATEGORY FILTER PILLS */}
           {/* ========================================================= */}
 
-          <section className="mt-10">
-            <div className="mb-4 flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          <section className="mb-4">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
               {["all", ...EVENT_CATEGORIES].map((cat) => {
                 const isSelected = (selectedCategory ?? "all") === cat;
                 return (
@@ -777,7 +529,7 @@ export default async function OfficialEventsPage({
                 <p className="mt-1 text-xs text-[#94a3b8]">
                   {selectedCategory && selectedCategory !== "all"
                     ? "No upcoming events in this category."
-                    : "Create an event above to open registrations."}
+                    : "Post an event above to open registrations."}
                 </p>
 
               </div>
