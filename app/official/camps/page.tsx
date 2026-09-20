@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import Nav from "@/components/Nav";
 import Link from "next/link";
 import { createCamp, deleteCamp } from "./actions";
+import EditCampModal from "./EditCampModal";
 import { Tent, Plus, CalendarDays, MapPin, Trash2, Users, Eye } from "lucide-react";
 
 export default async function CampsPage() {
@@ -135,11 +136,14 @@ export default async function CampsPage() {
                   </Link>
 
                   {isOfficial && (
-                    <form action={async () => { "use server"; await deleteCamp(camp.id); }}>
-                      <button type="submit" className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600" title="Delete camp">
-                        <Trash2 size={15} />
-                      </button>
-                    </form>
+                    <>
+                      <EditCampModal camp={camp} />
+                      <form action={async () => { "use server"; await deleteCamp(camp.id); }}>
+                        <button type="submit" className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600" title="Delete camp">
+                          <Trash2 size={15} />
+                        </button>
+                      </form>
+                    </>
                   )}
                 </div>
               </div>

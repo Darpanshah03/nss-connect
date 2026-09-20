@@ -32,6 +32,32 @@ export async function createCamp(formData: FormData) {
   revalidatePath("/official/camps");
 }
 
+// Officials can correct any field of an already-created camp — a wrong
+// date, a typo in the name, an updated hours value, etc. Does not touch
+// camp_attendance; existing attendance records stay exactly as they were.
+export async function updateCamp(campId: string, formData: FormData) {
+  const { supabase } = await verifyOfficial();
+
+  const name = (formData.get("name") as string)?.trim();
+  const location = (formData.get("location") as string)?.trim() || null;
+  const start_date = formData.get("start_date") as string;
+  const end_date = formData.get("end_date") as string;
+  const description = (formData.get("description") as string)?.trim() || null;
+  const hours_value = parseFloat(formData.get("hours_value") as string) || 0;
+
+  if (!name || !start_date || !end_date) throw new Error("Name, start date and end date are required.");
+
+  const { error } = await supabase
+    .from("special_camps")
+    .update({ name, location, start_date, end_date, description, hours_value })
+    .eq("id", campId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/official/camps");
+  revalidatePath(`/official/camps/${campId}`);
+}
+
 export async function deleteCamp(campId: string) {
   const { supabase } = await verifyOfficial();
   const { error } = await supabase.from("special_camps").delete().eq("id", campId);
@@ -42,7 +68,6 @@ export async function deleteCamp(campId: string) {
 export async function saveCampAttendance(campId: string, presentUserIds: string[]) {
   const { supabase, user } = await verifyOfficial();
 
-  // Delete existing attendance for this camp and re-insert
   await supabase.from("camp_attendance").delete().eq("camp_id", campId);
 
   if (presentUserIds.length > 0) {
