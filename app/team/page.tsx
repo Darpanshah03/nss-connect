@@ -3,6 +3,7 @@ import { getViewer } from "@/lib/getViewer";
 import { createClient } from "@/lib/supabase/server";
 import Nav from "@/components/Nav";
 import CoreMemberCard from "./CoreMemberCard";
+import { getCappedHoursMapForAllUsers } from "@/lib/hoursEligibility";
 import {
   Sparkles,
   Users,
@@ -15,28 +16,26 @@ export default async function TeamPage() {
 
   const supabase = createClient();
 
-  const [{ data: profiles }, { data: roles }, { data: hours }, { data: adjustments }] = await Promise.all([
+  const [{ data: profiles }, { data: roles }] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, full_name, department, year, tenure_year, status, created_at, photo_url, photo_url_original")
       .order("full_name"),
     supabase.from("roles").select("user_id, role, position"),
-    supabase.from("attendance").select("user_id, hours_awarded").eq("present", true),
-    supabase.from("hour_adjustments").select("user_id, hours"),
   ]);
 
   const roleByUser = new Map((roles ?? []).map((r) => [r.user_id, r]));
-  const hoursByUser = new Map<string, number>();
-  (hours ?? []).forEach((h) =>
-    hoursByUser.set(h.user_id, (hoursByUser.get(h.user_id) ?? 0) + Number(h.hours_awarded))
-  );
-  (adjustments ?? []).forEach((a) =>
-    hoursByUser.set(a.user_id, (hoursByUser.get(a.user_id) ?? 0) + Number(a.hours))
-  );
 
   const nonOfficials = (profiles ?? []).filter(
     (p) => roleByUser.get(p.id)?.role !== "official"
   );
+
+  // Capped hours (each category maxes out at its own requirement before
+  // being summed) — same source of truth as /dashboard, /profile, and
+  // /official/volunteers, computed here in one bulk pass rather than a
+  // per-person loop.
+  const tenureYearByUser = new Map(nonOfficials.map((p) => [p.id, p.tenure_year ?? 1]));
+  const hoursByUser = await getCappedHoursMapForAllUsers(supabase, tenureYearByUser);
 
   const coreHeads = nonOfficials.filter(
     (p) => p.status === "active" && roleByUser.get(p.id)?.role === "core"

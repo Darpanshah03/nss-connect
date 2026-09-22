@@ -36,15 +36,13 @@ export default async function AttendeesPage({
       .eq("id", id)
       .single(),
 
-    // Correct table: registrations
     supabase
       .from("registrations")
       .select(
-        "id, user_id, registered_at, profiles(id, full_name, roll_number, department, year)"
+        "id, user_id, registered_at, profiles(id, full_name, roll_number, department, year, phone)"
       )
       .eq("event_id", id),
 
-    // Attendance is stored separately
     supabase
       .from("attendance")
       .select("user_id, present, hours_awarded")
@@ -55,6 +53,10 @@ export default async function AttendeesPage({
     redirect("/events");
   }
 
+  // Phone numbers are only shown to core team members and officials —
+  // never to plain volunteers viewing the same roster.
+  const canSeeContact = viewer.role === "official" || viewer.role === "core";
+
   const attendanceByUser = new Map(
     (attendance ?? []).map((record) => [
       record.user_id,
@@ -62,12 +64,6 @@ export default async function AttendeesPage({
     ])
   );
 
-  /*
-   * Build the final attendee rows by combining:
-   *
-   * registrations → who registered
-   * attendance    → whether they were marked present
-   */
   const rows = (registrations ?? []).map((registration) => {
     const attendanceRecord = attendanceByUser.get(
       registration.user_id
@@ -94,6 +90,7 @@ export default async function AttendeesPage({
     "Roll Number": row.profile?.roll_number ?? "",
     Department: row.profile?.department ?? "",
     Year: row.profile?.year ?? "",
+    ...(canSeeContact ? { Phone: row.profile?.phone ?? "" } : {}),
     Attendance: row.present ? "Present" : "Pending",
     "Hours Awarded": row.hours_awarded,
   }));
@@ -183,7 +180,7 @@ export default async function AttendeesPage({
               </div>
 
               <ExportButton
-                filename={`${exportFilename}.csv`}
+                filename={exportFilename}
                 rows={exportRows}
                 label="Export Attendance"
               />
@@ -229,6 +226,12 @@ export default async function AttendeesPage({
                   <th className="px-4 py-3 font-medium">
                     Year
                   </th>
+
+                  {canSeeContact && (
+                    <th className="px-4 py-3 font-medium">
+                      Phone
+                    </th>
+                  )}
 
                   <th className="px-4 py-3 text-right font-medium">
                     Attendance
@@ -290,6 +293,12 @@ export default async function AttendeesPage({
                           ? `Year ${row.profile.year}`
                           : "—"}
                       </td>
+
+                      {canSeeContact && (
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {row.profile?.phone ?? "—"}
+                        </td>
+                      )}
 
                       <td className="px-4 py-3 text-right">
                         {row.present ? (

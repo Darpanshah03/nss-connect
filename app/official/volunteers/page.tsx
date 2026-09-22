@@ -54,7 +54,8 @@ export default async function VolunteersPage({
 
   const roleByUser = new Map((roles ?? []).map((r) => [r.user_id, r]));
 
-  // Raw hours — unchanged, shown on each volunteer's card exactly as before.
+  // Raw hours — kept only for the CSV export's "Hours Logged" column, so
+  // officials can still see genuine total activity there if they want it.
   const rawHoursByUser = new Map<string, number>();
   (hours ?? []).forEach((h) =>
     rawHoursByUser.set(h.user_id, (rawHoursByUser.get(h.user_id) ?? 0) + Number(h.hours_awarded))
@@ -65,8 +66,9 @@ export default async function VolunteersPage({
     return r?.role !== "official";
   });
 
-  // Capped hours — used only for the "completed 120/240 hrs" filter, in one
-  // bulk pass rather than a per-volunteer loop.
+  // Capped hours — this is now the number displayed on-screen everywhere
+  // (the badge on each row), consistent with /dashboard, /profile, and
+  // /team, so excess hours in one category never inflate the shown total.
   const tenureYearByUser = new Map(allVolunteers.map((v) => [v.id, v.tenure_year ?? 1]));
   const cappedHoursByUser = await getCappedHoursMapForAllUsers(supabase, tenureYearByUser);
 
@@ -207,7 +209,7 @@ export default async function VolunteersPage({
         <div className="space-y-3">
           {filteredVolunteers.map((p) => {
             const role = roleByUser.get(p.id);
-            const totalHours = rawHoursByUser.get(p.id) ?? 0;
+            const cappedHours = cappedHoursByUser.get(p.id) ?? 0;
             const isCore = role?.role === "core";
 
             return (
@@ -267,7 +269,7 @@ export default async function VolunteersPage({
                   <div className="flex items-center gap-1.5 bg-paper border border-steel px-3 py-1.5 rounded-xl">
                     <span className="text-[10px] uppercase font-bold text-navy/40">Hours:</span>
                     <span className="font-mono font-bold text-sm text-navy">
-                      {totalHours}h
+                      {cappedHours}h
                     </span>
                   </div>
 
